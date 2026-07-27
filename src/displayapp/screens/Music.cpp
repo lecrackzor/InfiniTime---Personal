@@ -105,7 +105,7 @@ Music::Music(Pinetime::Controllers::MusicService& music) : musicService(music) {
   txtTrackDuration = lv_label_create(lv_scr_act(), nullptr);
   lv_label_set_long_mode(txtTrackDuration, LV_LABEL_LONG_SROLL);
   lv_obj_align(txtTrackDuration, nullptr, LV_ALIGN_IN_TOP_LEFT, 12, 20);
-  lv_label_set_text_static(txtTrackDuration, "--:--/--:--");
+  lv_label_set_text_static(txtTrackDuration, lengthDefault);
   lv_label_set_align(txtTrackDuration, LV_ALIGN_IN_LEFT_MID);
   lv_obj_set_width(txtTrackDuration, LV_HOR_RES);
 
@@ -117,15 +117,16 @@ Music::Music(Pinetime::Controllers::MusicService& music) : musicService(music) {
   lv_obj_align(txtArtist, nullptr, LV_ALIGN_IN_LEFT_MID, 12, MIDDLE_OFFSET + 2 * FONT_HEIGHT + LINE_PAD);
   lv_label_set_align(txtArtist, LV_ALIGN_IN_LEFT_MID);
   lv_obj_set_width(txtArtist, LV_HOR_RES - 12);
-  lv_label_set_text_static(txtArtist, "");
+  lv_label_set_text_static(txtArtist, artistDefault);
   lv_obj_set_style_local_text_color(txtArtist, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, Colors::lightGray);
 
   txtTrack = lv_label_create(lv_scr_act(), nullptr);
   lv_label_set_long_mode(txtTrack, LV_LABEL_LONG_SROLL_CIRC);
   lv_obj_align(txtTrack, nullptr, LV_ALIGN_IN_LEFT_MID, 12, MIDDLE_OFFSET + 1 * FONT_HEIGHT);
+
   lv_label_set_align(txtTrack, LV_ALIGN_IN_LEFT_MID);
   lv_obj_set_width(txtTrack, LV_HOR_RES - 12);
-  lv_label_set_text_static(txtTrack, "");
+  lv_label_set_text_static(txtTrack, trackDefault);
 
   pageIndicator.Create();
 
@@ -152,14 +153,24 @@ Music::~Music() {
 }
 
 void Music::Refresh() {
-  if (artist != musicService.getArtist()) {
+  if (musicDidExist != musicExists || artist != musicService.getArtist()) {
     artist = musicService.getArtist();
-    lv_label_set_text(txtArtist, artist.data());
+
+    if (musicExists) {
+      lv_label_set_text(txtArtist, artist.data());
+    } else {
+      lv_label_set_text_static(txtArtist, artistDefault);
+    }
   }
 
-  if (track != musicService.getTrack()) {
+  if (musicDidExist != musicExists || track != musicService.getTrack()) {
     track = musicService.getTrack();
-    lv_label_set_text(txtTrack, track.data());
+
+    if (musicExists) {
+      lv_label_set_text(txtTrack, track.data());
+    } else {
+      lv_label_set_text_static(txtTrack, trackDefault);
+    }
   }
 
   if (album != musicService.getAlbum()) {
@@ -175,8 +186,13 @@ void Music::Refresh() {
     UpdateLength();
   }
 
+  if (musicDidExist != musicExists) {
+    musicDidExist = musicExists;
+  }
+
   if (totalLength != musicService.getTrackLength()) {
     totalLength = musicService.getTrackLength();
+    musicExists = totalLength > 0;
     UpdateLength();
   }
 
@@ -204,7 +220,9 @@ void Music::Refresh() {
 }
 
 void Music::UpdateLength() {
-  if (totalLength > (99 * 60 * 60)) {
+  if (!musicExists) {
+    lv_label_set_text_static(txtTrackDuration, lengthDefault);
+  } else if (totalLength > (99 * 60 * 60)) {
     lv_label_set_text_static(txtTrackDuration, "Inf/Inf");
   } else if (totalLength > (99 * 60)) {
     lv_label_set_text_fmt(txtTrackDuration,

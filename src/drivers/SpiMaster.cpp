@@ -296,11 +296,17 @@ bool SpiMaster::WriteCmdAndBuffer(uint8_t pinCsn, const uint8_t* cmd, size_t cmd
   while (spiBaseAddress->EVENTS_END == 0)
     ;
 
-  PrepareTx((uint32_t) data, dataSize);
-  spiBaseAddress->TASKS_START = 1;
+  while (dataSize > 0) {
+    size_t writeSize = std::min(dataSize, static_cast<size_t>(255));
+    PrepareTx((uint32_t) data, writeSize);
+    spiBaseAddress->TASKS_START = 1;
 
-  while (spiBaseAddress->EVENTS_END == 0)
-    ;
+    while (spiBaseAddress->EVENTS_END == 0) {
+      ;
+    }
+    data += writeSize;
+    dataSize -= writeSize;
+  }
   nrf_gpio_pin_set(this->pinCsn);
 
   xSemaphoreGive(mutex);
