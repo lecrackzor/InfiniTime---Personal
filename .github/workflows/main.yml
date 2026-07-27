@@ -100,6 +100,12 @@ jobs:
       with:
         submodules: recursive
 
+    - name: Set ref_name, but replace slashes with dashes.
+      shell: bash
+      env:
+        ref_name: ${{ github.head_ref || github.ref_name }}
+      run: echo "REF_NAME=${ref_name//\//-}" >> $GITHUB_ENV
+
     - name: Get InfiniSim repo
       run:  |
         git clone https://github.com/InfiniTimeOrg/InfiniSim.git --depth 1 --branch main
