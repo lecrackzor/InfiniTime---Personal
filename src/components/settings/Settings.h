@@ -404,7 +404,8 @@ namespace Pinetime {
 
         WatchFaceCasioCustom watchFaceCasioCustom;
 
-        std::bitset<5> wakeUpMode {0};
+        // DoubleTap on by default (bit 1); SingleTap/RaiseWrist/Shake/LowerWrist off
+        std::bitset<5> wakeUpMode {0b00010};
         uint16_t shakeWakeThreshold = 150;
 
         Controllers::BrightnessController::Levels brightLevel = Controllers::BrightnessController::Levels::Medium;

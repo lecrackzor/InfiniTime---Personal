@@ -33,6 +33,9 @@ Removed from the default app list:
 
 Kept: Stopwatch, Alarm, Timer, Steps, Heart Rate, Music, Navigation, Calculator, Weather
 
+### Defaults
+- Wake-up: **Double Tap** enabled by default (factory / wiped settings only; existing `settings.h` is unchanged)
+
 ### Bug fixes
 - Timer: screen can sleep again after tapping **Reset** during the ring ([upstream #2419](https://github.com/InfiniTimeOrg/InfiniTime/issues/2419))
 - Timer: keep buzzing for the full 10s after expiry if ringing was interrupted ([upstream #2428](https://github.com/InfiniTimeOrg/InfiniTime/pull/2428))
