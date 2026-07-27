@@ -78,8 +78,9 @@ int AlertNotificationService::OnAlert(struct ble_gatt_access_ctxt* ctxt) {
     }
 
     auto event = Pinetime::System::Messages::OnNewNotification;
-    notificationManager.Push(std::move(notif));
-    systemTask.PushMessage(event);
+    if (notificationManager.PushIfNew(std::move(notif))) {
+      systemTask.PushMessage(event);
+    }
   }
   return 0;
 }

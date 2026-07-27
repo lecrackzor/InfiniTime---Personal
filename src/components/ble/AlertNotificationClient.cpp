@@ -161,9 +161,9 @@ void AlertNotificationClient::OnNotification(ble_gap_event* event) {
     notif.message[messageSize - 1] = '\0';
     notif.size = messageSize;
     notif.category = Pinetime::Controllers::NotificationManager::Categories::SimpleAlert;
-    notificationManager.Push(std::move(notif));
-
-    systemTask.PushMessage(Pinetime::System::Messages::OnNewNotification);
+    if (notificationManager.PushIfNew(std::move(notif))) {
+      systemTask.PushMessage(Pinetime::System::Messages::OnNewNotification);
+    }
   }
 }
 

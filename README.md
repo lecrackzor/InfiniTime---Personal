@@ -52,6 +52,7 @@ Kept: Stopwatch, Alarm, Timer, Steps, Heart Rate, Music, Navigation, Calculator,
 - SPI: chunk `WriteCmdAndBuffer` payloads the same way as reads/writes
 - Stopwatch: lap labels wrap in 1..999 (0 is empty-slot sentinel, so `% 1000` made laps vanish)
 - Notifications: `GetPrevious` bounds against valid count, not buffer capacity
+- Notifications: drop exact duplicates already in the ring buffer (common companion double-send)
 - CI: set `REF_NAME` in the InfiniSim job so artifacts are not named `infinitisim-` ([upstream #2223](https://github.com/InfiniTimeOrg/InfiniTime/issues/2223))
 
 ### InfiniSim

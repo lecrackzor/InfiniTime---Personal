@@ -39,6 +39,8 @@ namespace Pinetime {
       };
 
       void Push(Notification&& notif);
+      /// Returns false if the notification was a duplicate of one already stored.
+      bool PushIfNew(Notification&& notif);
       Notification GetLastNotification() const;
       Notification Get(Notification::Id id) const;
       Notification GetNext(Notification::Id id) const;
