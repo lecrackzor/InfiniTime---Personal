@@ -35,7 +35,9 @@ void StopWatchController::AddLapToHistory() {
   TickType_t lapEnd = GetElapsedTime();
   history--;
   history[0].timeSinceStart = lapEnd;
-  history[0].number = ++maxLapNumber % lapNumberBoundary;
+  // Lap number 0 is the empty-slot sentinel in GetLapFromHistory; keep labels in 1..999.
+  maxLapNumber = (maxLapNumber % (lapNumberBoundary - 1)) + 1;
+  history[0].number = maxLapNumber;
 }
 
 uint16_t StopWatchController::GetMaxLapNumber() {

@@ -85,7 +85,7 @@ NotificationManager::Notification NotificationManager::GetPrevious(NotificationM
   if (idx == this->size) {
     return {};
   }
-  if (static_cast<size_t>(idx + 1) >= notifications.size()) {
+  if (static_cast<size_t>(idx + 1) >= this->size) {
     return {};
   }
   return this->At(idx + 1);
