@@ -447,14 +447,17 @@ void SystemTask::GoToRunning() {
     }
   }
 
+  // Mark Running before notifying DisplayApp. DisplayApp ignores GoToRunning while
+  // IsSleeping() is true; with InfiniSim's equal-priority SDL threads the message
+  // can be handled before this function returns if state is updated last.
+  state = SystemTaskState::Running;
+
   displayApp.PushMessage(Pinetime::Applications::Display::Messages::GoToRunning);
   heartRateApp.PushMessage(Pinetime::Applications::HeartRateTask::Messages::WakeUp);
 
   if (bleController.IsRadioEnabled() && !bleController.IsConnected()) {
     nimbleController.RestartFastAdv();
   }
-
-  state = SystemTaskState::Running;
 };
 
 void SystemTask::GoToSleep() {
