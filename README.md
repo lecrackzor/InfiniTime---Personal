@@ -19,6 +19,16 @@ Personal [InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime) fork for the 
 - Long-press overlay: cycle face color (paintbrush) and step display brightness
 - Top status bar shows a bell when the alarm is enabled
 
+### Apps
+Removed from the default app list:
+- Paint
+- Paddle
+- Twos
+- Dice
+- Metronome
+
+Kept: Stopwatch, Alarm, Timer, Steps, Heart Rate, Music, Navigation, Calculator, Weather
+
 ### Bug fixes
 - Timer: screen can sleep again after tapping **Reset** during the ring ([upstream #2419](https://github.com/InfiniTimeOrg/InfiniTime/issues/2419))
 - Timer: keep buzzing for the full 10s after expiry if ringing was interrupted ([upstream #2428](https://github.com/InfiniTimeOrg/InfiniTime/pull/2428))
