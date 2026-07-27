@@ -55,6 +55,10 @@ namespace Pinetime {
         int colorIndex = 0;
       };
 
+      struct WatchFaceCasioCustom {
+        Colors color = Colors::Lime;
+      };
+
       Settings(Pinetime::Controllers::FS& fs);
 
       Settings(const Settings&) = delete;
@@ -137,6 +141,17 @@ namespace Pinetime {
 
       int GetInfineatColorIndex() const {
         return settings.watchFaceInfineat.colorIndex;
+      };
+
+      void SetCasioColor(Colors color) {
+        if (color != settings.watchFaceCasioCustom.color) {
+          settings.watchFaceCasioCustom.color = color;
+          settingsChanged = true;
+        }
+      };
+
+      Colors GetCasioColor() const {
+        return settings.watchFaceCasioCustom.color;
       };
 
       void SetPTSGaugeStyle(PTSGaugeStyle gaugeStyle) {
@@ -354,7 +369,7 @@ namespace Pinetime {
     private:
       Pinetime::Controllers::FS& fs;
 
-      static constexpr uint32_t settingsVersion = 0x000a;
+      static constexpr uint32_t settingsVersion = 0x000b;
 
       struct SettingsData {
         uint32_t version = settingsVersion;
@@ -375,6 +390,8 @@ namespace Pinetime {
         PrideFlag prideFlag = PrideFlag::Gay;
 
         WatchFaceInfineat watchFaceInfineat;
+
+        WatchFaceCasioCustom watchFaceCasioCustom;
 
         std::bitset<5> wakeUpMode {0};
         uint16_t shakeWakeThreshold = 150;

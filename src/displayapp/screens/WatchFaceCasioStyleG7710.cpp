@@ -2,17 +2,34 @@
 
 #include <lvgl/lvgl.h>
 #include <cstdio>
+#include <FreeRTOS.h>
+#include <task.h>
+#include "displayapp/Colors.h"
 #include "displayapp/screens/BatteryIcon.h"
 #include "displayapp/screens/BleIcon.h"
 #include "displayapp/screens/NotificationIcon.h"
 #include "displayapp/screens/Symbols.h"
+#include "displayapp/screens/WeatherSymbols.h"
 #include "components/battery/BatteryController.h"
 #include "components/ble/BleController.h"
 #include "components/ble/NotificationManager.h"
 #include "components/heartrate/HeartRateController.h"
 #include "components/motion/MotionController.h"
+#include "components/ble/SimpleWeatherService.h"
+#include "components/brightness/BrightnessController.h"
 #include "components/settings/Settings.h"
+
 using namespace Pinetime::Applications::Screens;
+
+extern lv_font_t jetbrains_mono_bold_20;
+LV_FONT_DECLARE(lv_font_sys_48);
+
+namespace {
+  void event_handler(lv_obj_t* obj, lv_event_t event) {
+    auto* screen = static_cast<WatchFaceCasioStyleG7710*>(obj->user_data);
+    screen->OnOverlayButtonEvent(obj, event);
+  }
+}
 
 WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTimeController,
                                                    const Controllers::Battery& batteryController,
@@ -21,8 +38,11 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
                                                    Controllers::Settings& settingsController,
                                                    Controllers::HeartRateController& heartRateController,
                                                    Controllers::MotionController& motionController,
+                                                   Controllers::SimpleWeatherService& weatherService,
+                                                   Controllers::BrightnessController& brightnessController,
                                                    Controllers::FS& filesystem)
   : currentDateTime {{}},
+    color_text {Convert(settingsController.GetCasioColor())},
     batteryIcon(false),
     dateTimeController {dateTimeController},
     batteryController {batteryController},
@@ -30,7 +50,9 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
     notificatioManager {notificatioManager},
     settingsController {settingsController},
     heartRateController {heartRateController},
-    motionController {motionController} {
+    motionController {motionController},
+    weatherService {weatherService},
+    brightnessController {brightnessController} {
 
   lfs_file f = {};
   if (filesystem.FileOpen(&f, "/fonts/lv_font_dots_40.bin", LFS_O_RDONLY) >= 0) {
@@ -72,23 +94,42 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
   lv_label_set_text_static(notificationIcon, NotificationIcon::GetIcon(false));
   lv_obj_align(notificationIcon, bleIcon, LV_ALIGN_OUT_LEFT_MID, -5, 0);
 
+  label_date = lv_label_create(lv_scr_act(), nullptr);
+  lv_obj_align(label_date, lv_scr_act(), LV_ALIGN_IN_TOP_LEFT, 5, 22);
+  lv_obj_set_style_local_text_color(label_date, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_font(label_date, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, font_segment40);
+  lv_label_set_text_static(label_date, "6-30");
+
   label_day_of_week = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_align(label_day_of_week, lv_scr_act(), LV_ALIGN_IN_TOP_LEFT, 10, 64);
   lv_obj_set_style_local_text_color(label_day_of_week, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_font(label_day_of_week, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, font_dot40);
   lv_label_set_text_static(label_day_of_week, "SUN");
 
-  label_week_number = lv_label_create(lv_scr_act(), nullptr);
-  lv_obj_align(label_week_number, lv_scr_act(), LV_ALIGN_IN_TOP_LEFT, 5, 22);
-  lv_obj_set_style_local_text_color(label_week_number, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_font(label_week_number, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, font_dot40);
-  lv_label_set_text_static(label_week_number, "WK26");
+  label_temperature_unit = lv_label_create(lv_scr_act(), nullptr);
+  lv_obj_set_style_local_text_color(label_temperature_unit, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_font(label_temperature_unit, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, font_dot40);
+  lv_label_set_text_static(label_temperature_unit, "");
 
-  label_day_of_year = lv_label_create(lv_scr_act(), nullptr);
-  lv_obj_align(label_day_of_year, lv_scr_act(), LV_ALIGN_IN_TOP_LEFT, 100, 30);
-  lv_obj_set_style_local_text_color(label_day_of_year, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_font(label_day_of_year, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, font_segment40);
-  lv_label_set_text_static(label_day_of_year, "181-184");
+  label_temperature = lv_label_create(lv_scr_act(), nullptr);
+  lv_obj_set_style_local_text_color(label_temperature, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_font(label_temperature, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, font_segment40);
+  lv_label_set_text_static(label_temperature, "");
+
+  label_weather_icon = lv_label_create(lv_scr_act(), nullptr);
+  lv_obj_set_style_local_text_color(label_weather_icon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_font(label_weather_icon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &fontawesome_weathericons);
+  lv_label_set_text_static(label_weather_icon, "");
+
+  label_temperature_low = lv_label_create(lv_scr_act(), nullptr);
+  lv_obj_set_style_local_text_color(label_temperature_low, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_font(label_temperature_low, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &jetbrains_mono_bold_20);
+  lv_label_set_text_static(label_temperature_low, "");
+
+  label_temperature_high = lv_label_create(lv_scr_act(), nullptr);
+  lv_obj_set_style_local_text_color(label_temperature_high, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_font(label_temperature_high, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &jetbrains_mono_bold_20);
+  lv_label_set_text_static(label_temperature_high, "");
 
   lv_style_init(&style_line);
   lv_style_set_line_width(&style_line, LV_STATE_DEFAULT, 2);
@@ -110,16 +151,10 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
   lv_obj_add_style(line_day_of_week_number, LV_LINE_PART_MAIN, &style_border);
   lv_obj_align(line_day_of_week_number, nullptr, LV_ALIGN_IN_TOP_LEFT, 0, 8);
 
-  line_day_of_year = lv_line_create(lv_scr_act(), nullptr);
-  lv_line_set_points(line_day_of_year, line_day_of_year_points, 3);
-  lv_obj_add_style(line_day_of_year, LV_LINE_PART_MAIN, &style_line);
-  lv_obj_align(line_day_of_year, nullptr, LV_ALIGN_IN_TOP_RIGHT, 0, 60);
-
-  label_date = lv_label_create(lv_scr_act(), nullptr);
-  lv_obj_align(label_date, lv_scr_act(), LV_ALIGN_IN_TOP_LEFT, 100, 70);
-  lv_obj_set_style_local_text_color(label_date, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_font(label_date, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, font_segment40);
-  lv_label_set_text_static(label_date, "6-30");
+  line_temperature = lv_line_create(lv_scr_act(), nullptr);
+  lv_line_set_points(line_temperature, line_day_of_year_points, 3);
+  lv_obj_add_style(line_temperature, LV_LINE_PART_MAIN, &style_line);
+  lv_obj_align(line_temperature, nullptr, LV_ALIGN_IN_TOP_RIGHT, 0, 60);
 
   line_date = lv_line_create(lv_scr_act(), nullptr);
   lv_line_set_points(line_date, line_date_points, 3);
@@ -168,12 +203,37 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
   lv_label_set_text_static(stepIcon, Symbols::shoe);
   lv_obj_align(stepIcon, stepValue, LV_ALIGN_OUT_LEFT_MID, -5, 0);
 
+  btnSetColor = lv_btn_create(lv_scr_act(), nullptr);
+  btnSetColor->user_data = this;
+  lv_obj_set_size(btnSetColor, 150, 60);
+  lv_obj_align(btnSetColor, lv_scr_act(), LV_ALIGN_CENTER, 0, -40);
+  lv_obj_set_style_local_radius(btnSetColor, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, 20);
+  lv_obj_set_style_local_bg_opa(btnSetColor, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_OPA_50);
+  lv_obj_set_event_cb(btnSetColor, event_handler);
+  lv_obj_t* lblSetColor = lv_label_create(btnSetColor, nullptr);
+  lv_obj_set_style_local_text_font(lblSetColor, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &lv_font_sys_48);
+  lv_label_set_text_static(lblSetColor, Symbols::paintbrushLg);
+  lv_obj_set_hidden(btnSetColor, true);
+
+  btnBrightness = lv_btn_create(lv_scr_act(), nullptr);
+  btnBrightness->user_data = this;
+  lv_obj_set_size(btnBrightness, 150, 60);
+  lv_obj_align(btnBrightness, lv_scr_act(), LV_ALIGN_CENTER, 0, 40);
+  lv_obj_set_style_local_radius(btnBrightness, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, 20);
+  lv_obj_set_style_local_bg_opa(btnBrightness, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_OPA_50);
+  lv_obj_set_event_cb(btnBrightness, event_handler);
+  lblBrightness = lv_label_create(btnBrightness, nullptr);
+  lv_obj_set_style_local_text_font(lblBrightness, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &lv_font_sys_48);
+  lv_label_set_text_static(lblBrightness, brightnessController.GetIcon());
+  lv_obj_set_hidden(btnBrightness, true);
+
   taskRefresh = lv_task_create(RefreshTaskCallback, LV_DISP_DEF_REFR_PERIOD, LV_TASK_PRIO_MID, this);
   Refresh();
 }
 
 WatchFaceCasioStyleG7710::~WatchFaceCasioStyleG7710() {
   lv_task_del(taskRefresh);
+  settingsController.SaveSettings();
 
   lv_style_reset(&style_line);
   lv_style_reset(&style_border);
@@ -193,7 +253,103 @@ WatchFaceCasioStyleG7710::~WatchFaceCasioStyleG7710() {
   lv_obj_clean(lv_scr_act());
 }
 
+void WatchFaceCasioStyleG7710::ApplyColor(lv_color_t color) {
+  color_text = color;
+
+  lv_obj_set_style_local_text_color(label_battery_value, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  batteryIcon.SetColor(color_text);
+  lv_obj_set_style_local_text_color(batteryPlug, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_color(bleIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_color(notificationIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_color(label_date, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_color(label_day_of_week, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_color(label_temperature_unit, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_color(label_temperature, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_color(label_weather_icon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_color(label_temperature_low, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_color(label_temperature_high, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_color(label_time, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_color(label_time_ampm, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_color(stepValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_color(stepIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_color(heartbeatValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  if (heartbeatRunning.Get()) {
+    lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  }
+
+  lv_style_set_line_color(&style_line, LV_STATE_DEFAULT, color_text);
+  lv_style_set_line_color(&style_border, LV_STATE_DEFAULT, color_text);
+  lv_obj_add_style(line_icons, LV_LINE_PART_MAIN, &style_line);
+  lv_obj_add_style(line_day_of_week_number, LV_LINE_PART_MAIN, &style_border);
+  lv_obj_add_style(line_temperature, LV_LINE_PART_MAIN, &style_line);
+  lv_obj_add_style(line_date, LV_LINE_PART_MAIN, &style_line);
+  lv_obj_add_style(line_time, LV_LINE_PART_MAIN, &style_line);
+}
+
+Pinetime::Controllers::Settings::Colors WatchFaceCasioStyleG7710::GetNextColor(Pinetime::Controllers::Settings::Colors color) {
+  auto colorAsInt = static_cast<uint8_t>(color);
+  if (colorAsInt < 17) {
+    return static_cast<Controllers::Settings::Colors>(colorAsInt + 1);
+  }
+  return static_cast<Controllers::Settings::Colors>(0);
+}
+
+bool WatchFaceCasioStyleG7710::IsOverlayVisible() const {
+  return !lv_obj_get_hidden(btnSetColor);
+}
+
+void WatchFaceCasioStyleG7710::CloseOverlay() {
+  settingsController.SaveSettings();
+  lv_obj_set_hidden(btnSetColor, true);
+  lv_obj_set_hidden(btnBrightness, true);
+  colorMenuTick = 0;
+}
+
+bool WatchFaceCasioStyleG7710::OnTouchEvent(Pinetime::Applications::TouchEvents event) {
+  if (event == Pinetime::Applications::TouchEvents::LongTap && !IsOverlayVisible()) {
+    lv_label_set_text_static(lblBrightness, brightnessController.GetIcon());
+    lv_obj_set_hidden(btnSetColor, false);
+    lv_obj_set_hidden(btnBrightness, false);
+    colorMenuTick = xTaskGetTickCount();
+    return true;
+  }
+  if (event == Pinetime::Applications::TouchEvents::DoubleTap && IsOverlayVisible()) {
+    return true;
+  }
+  return false;
+}
+
+bool WatchFaceCasioStyleG7710::OnButtonPushed() {
+  if (IsOverlayVisible()) {
+    CloseOverlay();
+    return true;
+  }
+  return false;
+}
+
+void WatchFaceCasioStyleG7710::OnOverlayButtonEvent(lv_obj_t* object, lv_event_t event) {
+  if (event != LV_EVENT_CLICKED) {
+    return;
+  }
+  if (object == btnSetColor) {
+    auto next = GetNextColor(settingsController.GetCasioColor());
+    settingsController.SetCasioColor(next);
+    ApplyColor(Convert(next));
+    colorMenuTick = xTaskGetTickCount();
+  } else if (object == btnBrightness) {
+    brightnessController.Step();
+    lv_label_set_text_static(lblBrightness, brightnessController.GetIcon());
+    settingsController.SetBrightness(brightnessController.Level());
+    colorMenuTick = xTaskGetTickCount();
+  }
+}
+
 void WatchFaceCasioStyleG7710::Refresh() {
+  if (IsOverlayVisible() && colorMenuTick > 0 &&
+      (xTaskGetTickCount() - colorMenuTick > pdMS_TO_TICKS(3000))) {
+    CloseOverlay();
+  }
+
   powerPresent = batteryController.IsPowerPresent();
   if (powerPresent.IsUpdated()) {
     lv_label_set_text_static(batteryPlug, BatteryIcon::GetPlugIcon(powerPresent.Get()));
@@ -246,46 +402,51 @@ void WatchFaceCasioStyleG7710::Refresh() {
 
     currentDate = std::chrono::time_point_cast<std::chrono::days>(currentDateTime.Get());
     if (currentDate.IsUpdated()) {
-      const char* weekNumberFormat = "%V";
-
-      uint16_t year = dateTimeController.Year();
       Controllers::DateTime::Months month = dateTimeController.Month();
       uint8_t day = dateTimeController.Day();
-      int dayOfYear = dateTimeController.DayOfYear();
+
       if (settingsController.GetClockType() == Controllers::Settings::ClockType::H24) {
-        // 24h mode: ddmmyyyy, first DOW=Monday;
-        lv_label_set_text_fmt(label_date, "%3d-%2d", day, month);
-        weekNumberFormat = "%V"; // Replaced by the week number of the year (Monday as the first day of the week) as a decimal number
-                                 // [01,53]. If the week containing 1 January has four or more days in the new year, then it is considered
-                                 // week 1. Otherwise, it is the last week of the previous year, and the next week is week 1. Both January
-                                 // 4th and the first Thursday of January are always in week 1. [ tm_year, tm_wday, tm_yday]
+        lv_label_set_text_fmt(label_date, "%d-%d", day, static_cast<uint8_t>(month));
       } else {
-        // 12h mode: mmddyyyy, first DOW=Sunday;
-        lv_label_set_text_fmt(label_date, "%3d-%2d", month, day);
-        weekNumberFormat = "%U"; // Replaced by the week number of the year as a decimal number [00,53]. The first Sunday of January is the
-                                 // first day of week 1; days in the new year before this are in week 0. [ tm_year, tm_wday, tm_yday]
+        lv_label_set_text_fmt(label_date, "%d-%d", static_cast<uint8_t>(month), day);
       }
 
-      time_t ttTime =
-        std::chrono::system_clock::to_time_t(std::chrono::time_point_cast<std::chrono::system_clock::duration>(currentDateTime.Get()));
-      tm* tmTime = std::localtime(&ttTime);
-
-      // TODO: When we start using C++20, use std::chrono::year::is_leap
-      int daysInCurrentYear = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0 ? 366 : 365;
-      uint16_t daysTillEndOfYearNumber = daysInCurrentYear - dayOfYear;
-
-      char buffer[8];
-      strftime(buffer, 8, weekNumberFormat, tmTime);
-      uint8_t weekNumber = atoi(buffer);
-
       lv_label_set_text_fmt(label_day_of_week, "%s", dateTimeController.DayOfWeekShortToString());
-      lv_label_set_text_fmt(label_day_of_year, "%3d-%3d", dayOfYear, daysTillEndOfYearNumber);
-      lv_label_set_text_fmt(label_week_number, "WK%02d", weekNumber);
 
       lv_obj_realign(label_day_of_week);
-      lv_obj_realign(label_day_of_year);
-      lv_obj_realign(label_week_number);
       lv_obj_realign(label_date);
+    }
+  }
+
+  currentWeather = weatherService.Current();
+  if (currentWeather.IsUpdated()) {
+    auto optCurrentWeather = currentWeather.Get();
+    if (optCurrentWeather) {
+      const bool imperial = settingsController.GetWeatherFormat() == Controllers::Settings::WeatherFormat::Imperial;
+      int16_t temp = imperial ? optCurrentWeather->temperature.Fahrenheit() : optCurrentWeather->temperature.Celsius();
+      int16_t tempMin =
+        imperial ? optCurrentWeather->minTemperature.Fahrenheit() : optCurrentWeather->minTemperature.Celsius();
+      int16_t tempMax =
+        imperial ? optCurrentWeather->maxTemperature.Fahrenheit() : optCurrentWeather->maxTemperature.Celsius();
+
+      lv_label_set_text_fmt(label_temperature, "%d", temp);
+      lv_label_set_text_fmt(label_temperature_unit, "%c", imperial ? 'F' : 'C');
+      lv_label_set_text(label_weather_icon, Symbols::GetSymbol(optCurrentWeather->iconId, weatherService.IsNight()));
+      lv_label_set_text_fmt(label_temperature_low, "L%d", tempMin);
+      lv_label_set_text_fmt(label_temperature_high, "H%d", tempMax);
+
+      lv_obj_align(label_temperature_unit, lv_scr_act(), LV_ALIGN_IN_TOP_RIGHT, -8, 28);
+      lv_obj_align(label_temperature, label_temperature_unit, LV_ALIGN_OUT_LEFT_MID, -4, 2);
+      lv_obj_align(label_weather_icon, label_temperature, LV_ALIGN_OUT_LEFT_MID, -10, 0);
+
+      lv_obj_align(label_temperature_low, lv_scr_act(), LV_ALIGN_IN_TOP_LEFT, 105, 78);
+      lv_obj_align(label_temperature_high, lv_scr_act(), LV_ALIGN_IN_TOP_RIGHT, -8, 78);
+    } else {
+      lv_label_set_text_static(label_temperature, "");
+      lv_label_set_text_static(label_temperature_unit, "");
+      lv_label_set_text_static(label_weather_icon, "");
+      lv_label_set_text_static(label_temperature_low, "");
+      lv_label_set_text_static(label_temperature_high, "");
     }
   }
 

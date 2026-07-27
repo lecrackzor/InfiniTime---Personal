@@ -32,9 +32,9 @@ namespace Pinetime {
           {.intervalInSeconds = 0, .name = "Cont"},
           {.intervalInSeconds = 30, .name = " 30s"},
           {.intervalInSeconds = 60, .name = "  1m"},
+          {.intervalInSeconds = 3 * 60, .name = "  3m"},
           {.intervalInSeconds = 5 * 60, .name = "  5m"},
           {.intervalInSeconds = 10 * 60, .name = " 10m"},
-          {.intervalInSeconds = 30 * 60, .name = " 30m"},
         }};
 
         lv_obj_t* cbOption[options.size()];

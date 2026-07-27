@@ -5,10 +5,14 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <displayapp/Controllers.h>
 #include "displayapp/screens/Screen.h"
 #include "components/datetime/DateTimeController.h"
 #include "components/ble/BleController.h"
+#include "components/ble/SimpleWeatherService.h"
+#include "components/brightness/BrightnessController.h"
+#include "components/settings/Settings.h"
 #include "utility/DirtyValue.h"
 #include "displayapp/apps/Apps.h"
 
@@ -34,14 +38,24 @@ namespace Pinetime {
                                  Controllers::Settings& settingsController,
                                  Controllers::HeartRateController& heartRateController,
                                  Controllers::MotionController& motionController,
+                                 Controllers::SimpleWeatherService& weatherService,
+                                 Controllers::BrightnessController& brightnessController,
                                  Controllers::FS& filesystem);
         ~WatchFaceCasioStyleG7710() override;
 
+        bool OnTouchEvent(TouchEvents event) override;
+        bool OnButtonPushed() override;
         void Refresh() override;
+        void OnOverlayButtonEvent(lv_obj_t* object, lv_event_t event);
 
         static bool IsAvailable(Pinetime::Controllers::FS& filesystem);
 
       private:
+        void ApplyColor(lv_color_t color);
+        void CloseOverlay();
+        bool IsOverlayVisible() const;
+        static Controllers::Settings::Colors GetNextColor(Controllers::Settings::Colors color);
+
         Utility::DirtyValue<uint8_t> batteryPercentRemaining {};
         Utility::DirtyValue<bool> powerPresent {};
         Utility::DirtyValue<bool> bleState {};
@@ -52,6 +66,7 @@ namespace Pinetime {
         Utility::DirtyValue<bool> heartbeatRunning {};
         Utility::DirtyValue<bool> notificationState {};
         Utility::DirtyValue<std::chrono::time_point<std::chrono::system_clock, std::chrono::days>> currentDate;
+        Utility::DirtyValue<std::optional<Controllers::SimpleWeatherService::CurrentWeather>> currentWeather {};
 
         lv_point_t line_icons_points[3] {{0, 5}, {117, 5}, {122, 0}};
         lv_point_t line_day_of_week_number_points[4] {{0, 0}, {100, 0}, {95, 95}, {0, 95}};
@@ -59,7 +74,7 @@ namespace Pinetime {
         lv_point_t line_date_points[3] {{0, 5}, {135, 5}, {140, 0}};
         lv_point_t line_time_points[3] {{0, 0}, {230, 0}, {235, 5}};
 
-        lv_color_t color_text = lv_color_hex(0x98B69A);
+        lv_color_t color_text;
 
         lv_style_t style_line;
         lv_style_t style_border;
@@ -70,10 +85,13 @@ namespace Pinetime {
         lv_obj_t* label_date;
         lv_obj_t* line_date;
         lv_obj_t* label_day_of_week;
-        lv_obj_t* label_week_number;
         lv_obj_t* line_day_of_week_number;
-        lv_obj_t* label_day_of_year;
-        lv_obj_t* line_day_of_year;
+        lv_obj_t* label_temperature;
+        lv_obj_t* label_temperature_unit;
+        lv_obj_t* label_temperature_low;
+        lv_obj_t* label_temperature_high;
+        lv_obj_t* line_temperature;
+        lv_obj_t* label_weather_icon;
         lv_obj_t* backgroundLabel;
         lv_obj_t* bleIcon;
         lv_obj_t* batteryPlug;
@@ -84,6 +102,9 @@ namespace Pinetime {
         lv_obj_t* stepValue;
         lv_obj_t* notificationIcon;
         lv_obj_t* line_icons;
+        lv_obj_t* btnSetColor;
+        lv_obj_t* btnBrightness;
+        lv_obj_t* lblBrightness;
 
         BatteryIcon batteryIcon;
 
@@ -94,18 +115,21 @@ namespace Pinetime {
         Controllers::Settings& settingsController;
         Controllers::HeartRateController& heartRateController;
         Controllers::MotionController& motionController;
+        Controllers::SimpleWeatherService& weatherService;
+        Controllers::BrightnessController& brightnessController;
 
         lv_task_t* taskRefresh;
         lv_font_t* font_dot40 = nullptr;
         lv_font_t* font_segment40 = nullptr;
         lv_font_t* font_segment115 = nullptr;
+        TickType_t colorMenuTick = 0;
       };
     }
 
     template <>
     struct WatchFaceTraits<WatchFace::CasioStyleG7710> {
       static constexpr WatchFace watchFace = WatchFace::CasioStyleG7710;
-      static constexpr const char* name = "Casio G7710";
+      static constexpr const char* name = "Casio Custom";
 
       static Screens::Screen* Create(AppControllers& controllers) {
         return new Screens::WatchFaceCasioStyleG7710(controllers.dateTimeController,
@@ -115,6 +139,8 @@ namespace Pinetime {
                                                      controllers.settingsController,
                                                      controllers.heartRateController,
                                                      controllers.motionController,
+                                                     *controllers.weatherController,
+                                                     controllers.brightnessController,
                                                      controllers.filesystem);
       };
 
