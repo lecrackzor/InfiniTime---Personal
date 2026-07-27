@@ -81,11 +81,11 @@ namespace Pinetime {
         /** Total length in seconds */
         int totalLength = 0;
         /** Current position in seconds */
-        int currentPosition;
+        int currentPosition = 0;
         /** Last time an animation update or timer was incremented */
         TickType_t lastIncrement = 0;
 
-        bool playing;
+        bool playing = false;
 
         lv_task_t* taskRefresh;
 

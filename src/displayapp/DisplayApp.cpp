@@ -418,8 +418,8 @@ void DisplayApp::Refresh() {
           static_cast<Screens::PassKey*>(currentScreen.get())->UpdateKey(bleController.GetPairingKey());
         } else {
           LoadNewScreen(Apps::PassKey, DisplayApp::FullRefreshDirections::Up);
+          motorController.RunForDuration(35);
         }
-        motorController.RunForDuration(35);
         break;
       case Messages::TouchEvent: {
         if (state != States::Running) {

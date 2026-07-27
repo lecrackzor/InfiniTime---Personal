@@ -144,6 +144,9 @@ size_t NotificationManager::NbNotifications() const {
 }
 
 const char* NotificationManager::Notification::Message() const {
+  if (size == 0) {
+    return "";
+  }
   const char* itField = std::find(message.begin(), message.begin() + size - 1, '\0');
   if (itField != message.begin() + size - 1) {
     const char* ptr = (itField) + 1;
@@ -153,6 +156,9 @@ const char* NotificationManager::Notification::Message() const {
 }
 
 const char* NotificationManager::Notification::Title() const {
+  if (size == 0) {
+    return {};
+  }
   const char* itField = std::find(message.begin(), message.begin() + size - 1, '\0');
   if (itField != message.begin() + size - 1) {
     return message.data();

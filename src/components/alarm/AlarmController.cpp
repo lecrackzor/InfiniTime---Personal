@@ -168,10 +168,11 @@ void AlarmController::LoadSettingsFromFile() {
 
 void AlarmController::SaveSettingsToFile() const {
   lfs_dir systemDir;
-  if (fs.DirOpen("/.system", &systemDir) != LFS_ERR_OK) {
+  if (fs.DirOpen("/.system", &systemDir) == LFS_ERR_OK) {
+    fs.DirClose(&systemDir);
+  } else {
     fs.DirCreate("/.system");
   }
-  fs.DirClose(&systemDir);
   lfs_file_t alarmFile;
   if (fs.FileOpen(&alarmFile, "/.system/alarm.dat", LFS_O_WRONLY | LFS_O_CREAT) != LFS_ERR_OK) {
     NRF_LOG_WARNING("[AlarmController] Failed to open alarm data file for saving");

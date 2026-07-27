@@ -145,6 +145,9 @@ namespace Pinetime {
       void UpdateMotion();
       static constexpr TickType_t batteryMeasurementPeriod = pdMS_TO_TICKS(10 * 60 * 1000);
 
+      // Last power-present state we acted on (GPIO can re-fire after MeasureVoltage refreshed the cache).
+      bool lastHandledPowerPresent = false;
+
       SystemMonitor monitor;
     };
   }

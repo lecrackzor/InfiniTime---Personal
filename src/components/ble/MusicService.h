@@ -41,11 +41,11 @@ namespace Pinetime {
 
       void event(char event);
 
-      std::string getArtist() const;
+      const std::string& getArtist() const;
 
-      std::string getTrack() const;
+      const std::string& getTrack() const;
 
-      std::string getAlbum() const;
+      const std::string& getAlbum() const;
 
       int getProgress() const;
 

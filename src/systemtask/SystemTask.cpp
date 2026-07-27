@@ -87,7 +87,8 @@ SystemTask::SystemTask(Drivers::SpiMaster& spi,
 
 void SystemTask::Start() {
   systemTasksMsgQueue = xQueueCreate(10, 1);
-  if (pdPASS != xTaskCreate(SystemTask::Process, "MAIN", 350, this, 1, &taskHandle)) {
+  // 400 words: upstream #2407 measured ~1432B worst-case against the old 350*4=1400B stack.
+  if (pdPASS != xTaskCreate(SystemTask::Process, "MAIN", 400, this, 1, &taskHandle)) {
     APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
   }
 }
@@ -183,6 +184,7 @@ void SystemTask::Work() {
   nrfx_gpiote_in_event_enable(PinMap::PowerPresent, true);
 
   batteryController.MeasureVoltage();
+  lastHandledPowerPresent = batteryController.IsPowerPresent();
 
   measureBatteryTimer = xTimerCreate("measureBattery", batteryMeasurementPeriod, pdTRUE, this, MeasureBatteryTimerCallback);
   xTimerStart(measureBatteryTimer, portMAX_DELAY);
@@ -358,17 +360,23 @@ void SystemTask::Work() {
           }
           break;
         case Messages::OnChargingEvent: {
-          const bool wasPowerPresent = batteryController.IsPowerPresent();
           batteryController.ReadPowerState();
           const bool isPowerPresent = batteryController.IsPowerPresent();
-          // Debounced GPIO can re-fire; skip wake/HR churn when the plug state is unchanged.
-          if (wasPowerPresent == isPowerPresent) {
+          // Compare against the last state we handled — not the pre-read cache, which
+          // MeasureVoltage() may already have refreshed between the GPIO edge and here.
+          if (lastHandledPowerPresent == isPowerPresent) {
             break;
           }
+          lastHandledPowerPresent = isPowerPresent;
           if (isPowerPresent) {
             heartRateApp.PushMessage(Pinetime::Applications::HeartRateTask::Messages::PauseForCharging);
           } else {
             heartRateApp.PushMessage(Pinetime::Applications::HeartRateTask::Messages::ResumeFromCharging);
+            // GoToRunning() early-returns when already awake, so send WakeUp explicitly
+            // or HR stays in Waiting after an on-screen unplug.
+            if (state == SystemTaskState::Running) {
+              heartRateApp.PushMessage(Pinetime::Applications::HeartRateTask::Messages::WakeUp);
+            }
           }
           GoToRunning();
           break;

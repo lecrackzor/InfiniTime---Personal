@@ -252,9 +252,11 @@ void HeartRateTask::HandleSensorData() {
   if (ambient > 0) {
     // Reset all DAQ buffers
     ppg.Reset(true);
-    controller.Update(Controllers::HeartRateController::States::NotEnoughData, bpm);
+    // bpm may still be -1/-2 from the sensor path — never publish that as uint8_t 255/254.
     bpm = 0;
+    controller.Update(Controllers::HeartRateController::States::NotEnoughData, bpm);
     valueCurrentlyShown = false;
+    measurementSucceeded = false;
   }
 
   // Reset requested, or not enough data

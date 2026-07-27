@@ -63,6 +63,15 @@ Kept: Stopwatch, Alarm, Timer, Steps, Heart Rate, Music, Navigation, Calculator,
 - Charging: ignore duplicate power-present edges; HR pause/resume only transitions once
 - Alarm: coalesce `SetOffAlarmNow` / don't leak a second auto-stop LVGL task while alerting
 - CI: set `REF_NAME` in the InfiniSim job so artifacts are not named `infinitisim-` ([upstream #2223](https://github.com/InfiniTimeOrg/InfiniTime/issues/2223))
+- HR: wake sensor after unplug even if the screen was already on; never publish ambient `-1`/`-2` as BPM 254/255
+- Charging: latch handled power-present so `MeasureVoltage` can't make a real plug edge look like a no-op
+- BLE FS: hold `FS::Lock` across open/seek/read|write/close; don't `FileClose` after a failed READ_PACING open
+- Alarm settings: only `DirClose` when `DirOpen` succeeded
+- Music: initialize play/position members; return metadata by const ref (no per-refresh string copies)
+- DFU: keep version `0x0008` separate from GATT handles; stop re-resolving chars on every access
+- SystemTask: grow main stack 350→400 words (margin for upstream [#2407](https://github.com/InfiniTimeOrg/InfiniTime/issues/2407) worst-case)
+- Pairing: vibrate only when first showing PassKey
+- Notifications / HR controller: defensive empty-message and null-service guards
 
 ### InfiniSim
 Local InfiniSim patches (queue segfault fix + HR charging message enums) live in [`tools/infinisim-patches/`](tools/infinisim-patches/). Prefer keeping them on a personal InfiniSim fork once created.

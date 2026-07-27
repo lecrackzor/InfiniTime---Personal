@@ -40,22 +40,21 @@ DfuService::DfuService(Pinetime::System::SystemTask& systemTask,
                                 .access_cb = DfuServiceCallback,
                                 .arg = this,
                                 .flags = BLE_GATT_CHR_F_WRITE_NO_RSP,
-                                .val_handle = nullptr,
+                                .val_handle = &packetCharacteristicHandle,
                               },
                               {
                                 .uuid = &controlPointCharacteristicUuid.u,
                                 .access_cb = DfuServiceCallback,
                                 .arg = this,
                                 .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_NOTIFY,
-                                .val_handle = nullptr,
+                                .val_handle = &controlPointCharacteristicHandle,
                               },
                               {
                                 .uuid = &revisionCharacteristicUuid.u,
                                 .access_cb = DfuServiceCallback,
                                 .arg = this,
                                 .flags = BLE_GATT_CHR_F_READ,
-                                .val_handle = &revision,
-
+                                .val_handle = &revisionCharacteristicHandle,
                               },
                               {0}
 
@@ -97,10 +96,6 @@ int DfuService::OnServiceData(uint16_t connectionHandle, uint16_t attributeHandl
     xTimerStart(timeoutTimer, 0);
   }
 
-  ble_gatts_find_chr(&serviceUuid.u, &packetCharacteristicUuid.u, nullptr, &packetCharacteristicHandle);
-  ble_gatts_find_chr(&serviceUuid.u, &controlPointCharacteristicUuid.u, nullptr, &controlPointCharacteristicHandle);
-  ble_gatts_find_chr(&serviceUuid.u, &revisionCharacteristicUuid.u, nullptr, &revisionCharacteristicHandle);
-
   if (attributeHandle == packetCharacteristicHandle) {
     if (context->op == BLE_GATT_ACCESS_OP_WRITE_CHR)
       return WritePacketHandler(connectionHandle, context->om);
@@ -123,7 +118,8 @@ int DfuService::OnServiceData(uint16_t connectionHandle, uint16_t attributeHandl
 }
 
 int DfuService::SendDfuRevision(os_mbuf* om) const {
-  int res = os_mbuf_append(om, &revision, sizeof(revision));
+  const uint16_t version = dfuVersion;
+  int res = os_mbuf_append(om, &version, sizeof(version));
   return (res == 0) ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
 }
 

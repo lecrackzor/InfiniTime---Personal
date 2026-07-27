@@ -112,6 +112,7 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
       } else {
         resp.chunklen = std::min(header->chunksize, info.size); // TODO add mtu somehow
         resp.totallen = info.size;
+        FS::Lock lock(fs);
         fs.FileOpen(&f, filepath, LFS_O_RDONLY);
         fs.FileSeek(&f, header->chunkoff);
         uint8_t fileData[resp.chunklen] = {0};
@@ -131,7 +132,9 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
       resp.command = commands::READ_DATA;
       resp.status = 0x01;
       resp.chunkoff = header->chunkoff;
+      bool fileOpened = false;
       int res = fs.Stat(filepath, &info);
+      FS::Lock lock(fs);
       if (res == LFS_ERR_NOENT && info.type != LFS_TYPE_DIR) {
         resp.status = (int8_t) res;
         resp.chunklen = 0;
@@ -139,11 +142,15 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
       } else {
         resp.chunklen = std::min(header->chunksize, info.size); // TODO add mtu somehow
         resp.totallen = info.size;
-        fs.FileOpen(&f, filepath, LFS_O_RDONLY);
-        fs.FileSeek(&f, header->chunkoff);
+        if (fs.FileOpen(&f, filepath, LFS_O_RDONLY) == 0) {
+          fileOpened = true;
+          fs.FileSeek(&f, header->chunkoff);
+        } else {
+          resp.chunklen = 0;
+        }
       }
       os_mbuf* om;
-      if (resp.chunklen > 0) {
+      if (fileOpened && resp.chunklen > 0) {
         uint8_t fileData[resp.chunklen] = {0};
         resp.chunklen = fs.FileRead(&f, fileData, resp.chunklen);
         om = ble_hs_mbuf_from_flat(&resp, sizeof(ReadResponse));
@@ -152,7 +159,9 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
         resp.chunklen = 0;
         om = ble_hs_mbuf_from_flat(&resp, sizeof(ReadResponse));
       }
-      fs.FileClose(&f);
+      if (fileOpened) {
+        fs.FileClose(&f);
+      }
       ble_gattc_notify_custom(connectionHandle, transferCharacteristicHandle, om);
       break;
     }
@@ -192,12 +201,14 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
       resp.command = commands::WRITE_PACING;
       resp.offset = header->offset;
       int res = 0;
-
-      if (!(res = fs.FileOpen(&f, filepath, LFS_O_RDWR | LFS_O_CREAT))) {
-        if ((res = fs.FileSeek(&f, header->offset)) >= 0) {
-          res = fs.FileWrite(&f, header->data, header->dataSize);
+      {
+        FS::Lock lock(fs);
+        if (!(res = fs.FileOpen(&f, filepath, LFS_O_RDWR | LFS_O_CREAT))) {
+          if ((res = fs.FileSeek(&f, header->offset)) >= 0) {
+            res = fs.FileWrite(&f, header->data, header->dataSize);
+          }
+          fs.FileClose(&f);
         }
-        fs.FileClose(&f);
       }
       if (res < 0) {
         resp.status = static_cast<int8_t>(res);
@@ -344,6 +355,7 @@ void FSService::prepareReadDataResp(ReadHeader* header, ReadResponse* resp) {
     lfs_file f;
     resp->chunklen = std::min(header->chunksize, info.size);
     resp->totallen = info.size;
+    FS::Lock lock(fs);
     fs.FileOpen(&f, filepath, LFS_O_RDONLY);
     fs.FileSeek(&f, header->chunkoff);
     resp->chunklen = fs.FileRead(&f, resp->chunk, resp->chunklen);

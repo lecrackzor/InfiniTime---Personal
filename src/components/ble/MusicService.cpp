@@ -175,15 +175,15 @@ int Pinetime::Controllers::MusicService::OnCommand(struct ble_gatt_access_ctxt* 
   return 0;
 }
 
-std::string Pinetime::Controllers::MusicService::getAlbum() const {
+const std::string& Pinetime::Controllers::MusicService::getAlbum() const {
   return albumName;
 }
 
-std::string Pinetime::Controllers::MusicService::getArtist() const {
+const std::string& Pinetime::Controllers::MusicService::getArtist() const {
   return artistName;
 }
 
-std::string Pinetime::Controllers::MusicService::getTrack() const {
+const std::string& Pinetime::Controllers::MusicService::getTrack() const {
   return trackName;
 }
 

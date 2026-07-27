@@ -97,7 +97,8 @@ namespace Pinetime {
       static constexpr uint16_t controlPointCharacteristicId {0x1531};
       static constexpr uint16_t revisionCharacteristicId {0x1534};
 
-      uint16_t revision {0x0008};
+      // Nordic legacy DFU version characteristic value (must not share storage with the GATT handle).
+      static constexpr uint16_t dfuVersion {0x0008};
 
       static constexpr ble_uuid128_t packetCharacteristicUuid {
         .u {.type = BLE_UUID_TYPE_128},
@@ -113,9 +114,9 @@ namespace Pinetime {
 
       struct ble_gatt_chr_def characteristicDefinition[4];
       struct ble_gatt_svc_def serviceDefinition[2];
-      uint16_t packetCharacteristicHandle;
-      uint16_t controlPointCharacteristicHandle;
-      uint16_t revisionCharacteristicHandle;
+      uint16_t packetCharacteristicHandle {};
+      uint16_t controlPointCharacteristicHandle {};
+      uint16_t revisionCharacteristicHandle {};
 
       enum class States : uint8_t { Idle, Init, Start, Data, Validate, Validated };
       States state = States::Idle;
