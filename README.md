@@ -2,7 +2,7 @@
 
 Personal [InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime) fork for the PineTime. Built on upstream `main`; this page only covers what differs.
 
-Photos of the watchface / UI can go here later.
+![Casio Custom color cycling](doc/personal/casio-custom-color-cycle.gif)
 
 ## Changes vs upstream
 
