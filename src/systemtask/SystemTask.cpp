@@ -157,24 +157,26 @@ void SystemTask::Work() {
   // Setup Interrupts
   nrfx_gpiote_in_config_t pinConfig;
   pinConfig.skip_gpio_setup = false;
-  pinConfig.hi_accuracy = false;
   pinConfig.is_watcher = false;
 
-  // Button
+  // Button — high-accuracy so button edges are not dropped while touch IRQ is active (#2346)
   nrf_gpio_cfg_output(PinMap::ButtonEnable);
   nrf_gpio_pin_set(PinMap::ButtonEnable);
+  pinConfig.hi_accuracy = true;
   pinConfig.sense = NRF_GPIOTE_POLARITY_TOGGLE;
   pinConfig.pull = NRF_GPIO_PIN_PULLDOWN;
   nrfx_gpiote_in_init(PinMap::Button, &pinConfig, nrfx_gpiote_evt_handler);
   nrfx_gpiote_in_event_enable(PinMap::Button, true);
 
   // Touchscreen
+  pinConfig.hi_accuracy = true;
   pinConfig.sense = NRF_GPIOTE_POLARITY_HITOLO;
   pinConfig.pull = NRF_GPIO_PIN_PULLUP;
   nrfx_gpiote_in_init(PinMap::Cst816sIrq, &pinConfig, nrfx_gpiote_evt_handler);
   nrfx_gpiote_in_event_enable(PinMap::Cst816sIrq, true);
 
-  // Power present
+  // Power present — keep low-accuracy (rare edges; avoids an extra HFCLK consumer)
+  pinConfig.hi_accuracy = false;
   pinConfig.sense = NRF_GPIOTE_POLARITY_TOGGLE;
   pinConfig.pull = NRF_GPIO_PIN_NOPULL;
   nrfx_gpiote_in_init(PinMap::PowerPresent, &pinConfig, nrfx_gpiote_evt_handler);

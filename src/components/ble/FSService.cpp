@@ -92,6 +92,7 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
       auto* header = (ReadHeader*) om->om_data;
       uint16_t plen = header->pathlen;
       if (plen > maxpathlen) { //> counts for null term
+        systemTask.PushMessage(Pinetime::System::Messages::StopFileTransfer);
         return -1;
       }
       memcpy(filepath, header->pathstr, plen);
@@ -159,12 +160,14 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
       auto* header = (WriteHeader*) om->om_data;
       uint16_t plen = header->pathlen;
       if (plen > maxpathlen) { //> counts for null term
-        return -1;             // TODO make this actually return a BLE notif
+        // TODO make this actually return a BLE notif
+        systemTask.PushMessage(Pinetime::System::Messages::StopFileTransfer);
+        return -1;
       }
       memcpy(filepath, header->pathstr, plen);
       filepath[plen] = 0; // Copy and null terminate string
       fileSize = header->totalSize;
-      WriteResponse resp;
+      WriteResponse resp {};
       resp.command = commands::WRITE_PACING;
       resp.offset = header->offset;
       resp.modTime = 0;
@@ -172,7 +175,9 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
       int res = fs.FileOpen(&f, filepath, LFS_O_RDWR | LFS_O_CREAT);
       if (res == 0) {
         fs.FileClose(&f);
-        resp.status = (res == 0) ? 0x01 : (int8_t) res;
+        resp.status = 0x01;
+      } else {
+        resp.status = static_cast<int8_t>(res);
       }
       resp.freespace = std::min(fs.getSize() - (fs.GetFSSize() * fs.getBlockSize()), fileSize - header->offset);
       auto* om = ble_hs_mbuf_from_flat(&resp, sizeof(WriteResponse));
@@ -182,7 +187,7 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
     case commands::WRITE_DATA: {
       NRF_LOG_INFO("[FS_S] -> WriteData");
       auto* header = (WritePacing*) om->om_data;
-      WriteResponse resp;
+      WriteResponse resp {};
       resp.command = commands::WRITE_PACING;
       resp.offset = header->offset;
       int res = 0;
@@ -194,7 +199,9 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
         fs.FileClose(&f);
       }
       if (res < 0) {
-        resp.status = (int8_t) res;
+        resp.status = static_cast<int8_t>(res);
+      } else {
+        resp.status = 0x01;
       }
       resp.freespace = std::min(fs.getSize() - (fs.GetFSSize() * fs.getBlockSize()), fileSize - header->offset);
       auto* om = ble_hs_mbuf_from_flat(&resp, sizeof(WriteResponse));

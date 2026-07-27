@@ -172,30 +172,41 @@ void StopWatch::RenderPause() {
 }
 
 void StopWatch::RenderLaps() {
-  lv_label_set_text(lapText, "");
+  char text[4 * 20] = {};
+  size_t pos = 0;
   for (int i = displayedLaps - 1; i >= 0; i--) {
     std::optional<LapInfo> lap = stopWatchController.GetLapFromHistory(i);
+    if (!lap) {
+      continue;
+    }
 
-    if (lap) {
-      TimeSeparated laptime = ConvertTicksToTimeSegments(lap->timeSinceStart);
-      char buffer[19];
-      if (laptime.hours > 0) {
-        snprintf(buffer,
-                 sizeof(buffer),
-                 "\n#%-3d %3d:%02d:%02d.%02d",
-                 lap->number,
-                 laptime.hours,
-                 laptime.mins,
-                 laptime.secs,
-                 laptime.hundredths);
-      } else if (laptime.mins > 0) {
-        snprintf(buffer, sizeof(buffer), "\n#%-3d     %2d:%02d.%02d", lap->number, laptime.mins, laptime.secs, laptime.hundredths);
-      } else {
-        snprintf(buffer, sizeof(buffer), "\n#%-3d        %2d.%02d", lap->number, laptime.secs, laptime.hundredths);
-      }
-      lv_label_ins_text(lapText, LV_LABEL_POS_LAST, buffer);
+    TimeSeparated laptime = ConvertTicksToTimeSegments(lap->timeSinceStart);
+    int written = 0;
+    if (laptime.hours > 0) {
+      written = snprintf(text + pos,
+                         sizeof(text) - pos,
+                         "\n#%-3d %3d:%02d:%02d.%02d",
+                         lap->number,
+                         laptime.hours,
+                         laptime.mins,
+                         laptime.secs,
+                         laptime.hundredths);
+    } else if (laptime.mins > 0) {
+      written = snprintf(text + pos,
+                         sizeof(text) - pos,
+                         "\n#%-3d     %2d:%02d.%02d",
+                         lap->number,
+                         laptime.mins,
+                         laptime.secs,
+                         laptime.hundredths);
+    } else {
+      written = snprintf(text + pos, sizeof(text) - pos, "\n#%-3d        %2d.%02d", lap->number, laptime.secs, laptime.hundredths);
+    }
+    if (written > 0) {
+      pos += static_cast<size_t>(written);
     }
   }
+  lv_label_set_text(lapText, text);
   lv_obj_realign(lapText);
 }
 

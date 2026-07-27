@@ -35,6 +35,7 @@
 #include "components/motor/MotorController.h"
 #include "components/datetime/DateTimeController.h"
 #include "components/heartrate/HeartRateController.h"
+#include "utility/Math.h"
 #include "components/stopwatch/StopWatchController.h"
 #include "components/fs/FS.h"
 #include "drivers/Spi.h"
@@ -358,6 +359,8 @@ int main() {
     // Clear Memory to known state
     memset(&__start_noinit_data, 0, (uintptr_t) &__stop_noinit_data - (uintptr_t) &__start_noinit_data);
     NoInit_MagicWord = NoInit_MagicValue;
+    // __DATE__ is "MMM DD YYYY"; offset 7 starts the year. Deferred until after logger.Init().
+    dateTimeController.SetTime(Pinetime::Utility::CompileTimeAtoi(&__DATE__[7]), 1, 1, 0, 0, 0);
   }
 
   systemTask.Start();
