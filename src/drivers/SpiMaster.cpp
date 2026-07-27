@@ -161,6 +161,7 @@ void SpiMaster::OnStartedEvent() {
 }
 
 void SpiMaster::PrepareTx(const uint32_t bufferAddress, const size_t size) {
+  ASSERT(size < 256);
   spiBaseAddress->TXD.PTR = bufferAddress;
   spiBaseAddress->TXD.MAXCNT = size;
   spiBaseAddress->TXD.LIST = 0;
@@ -171,6 +172,7 @@ void SpiMaster::PrepareTx(const uint32_t bufferAddress, const size_t size) {
 }
 
 void SpiMaster::PrepareRx(const uint32_t bufferAddress, const size_t size) {
+  ASSERT(size < 256);
   spiBaseAddress->TXD.PTR = 0;
   spiBaseAddress->TXD.MAXCNT = 0;
   spiBaseAddress->TXD.LIST = 0;
@@ -241,11 +243,17 @@ bool SpiMaster::Read(uint8_t pinCsn, uint8_t* cmd, size_t cmdSize, uint8_t* data
   while (spiBaseAddress->EVENTS_END == 0)
     ;
 
-  PrepareRx((uint32_t) data, dataSize);
-  spiBaseAddress->TASKS_START = 1;
+  while (dataSize > 0) {
+    size_t readSize = std::min(dataSize, static_cast<size_t>(255));
+    PrepareRx((uint32_t) data, readSize);
+    spiBaseAddress->TASKS_START = 1;
 
-  while (spiBaseAddress->EVENTS_END == 0)
-    ;
+    while (spiBaseAddress->EVENTS_END == 0) {
+      ;
+    }
+    data += readSize;
+    dataSize -= readSize;
+  }
   nrf_gpio_pin_set(this->pinCsn);
 
   xSemaphoreGive(mutex);
