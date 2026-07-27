@@ -9,6 +9,10 @@ using namespace Pinetime::Applications;
 
 namespace {
   constexpr TickType_t backgroundMeasurementTimeLimit = 30 * configTICK_RATE_HZ;
+
+  inline bool in_isr() {
+    return (SCB->ICSR & SCB_ICSR_VECTACTIVE_Msk) != 0;
+  }
 }
 
 std::optional<TickType_t> HeartRateTask::BackgroundMeasurementInterval() const {
@@ -171,6 +175,9 @@ void HeartRateTask::Work() {
           if (state == States::ForegroundMeasuring || state == States::BackgroundMeasuring) {
             newState = States::Waiting;
           }
+          // Clear stale BPM / "measuring" presentation while the sensor is forced off.
+          controller.Update(Controllers::HeartRateController::States::NotEnoughData, 0);
+          valueCurrentlyShown = false;
           break;
         case Messages::ResumeFromCharging:
           pausedByCharging = false;
@@ -206,9 +213,13 @@ void HeartRateTask::Work() {
 }
 
 void HeartRateTask::PushMessage(HeartRateTask::Messages msg) {
-  BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-  xQueueSendFromISR(messageQueue, &msg, &xHigherPriorityTaskWoken);
-  portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+  if (in_isr()) {
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xQueueSendFromISR(messageQueue, &msg, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+  } else {
+    xQueueSend(messageQueue, &msg, portMAX_DELAY);
+  }
 }
 
 void HeartRateTask::StartMeasurement() {

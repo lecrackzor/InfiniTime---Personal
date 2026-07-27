@@ -366,9 +366,17 @@ void DisplayApp::Refresh() {
       case Messages::UpdateBleConnection:
         // Only used for recovery firmware
         break;
-      case Messages::NewNotification:
+      case Messages::NewNotification: {
+        // Don't interrupt alarm/timer ringing or the flashlight with a notification preview.
+        // The notification stays queued and can be opened from the watchface later.
+        auto timerStatus = timer.GetTimerState();
+        const bool timerRinging = timerStatus && timerStatus->expired;
+        if (alarmController.IsAlerting() || timerRinging || currentApp == Apps::FlashLight) {
+          break;
+        }
         LoadNewScreen(Apps::NotificationsPreview, DisplayApp::FullRefreshDirections::Down);
         break;
+      }
       case Messages::TimerDone: {
         if (state != States::Running) {
           PushMessageToSystemTask(System::Messages::GoToRunning);

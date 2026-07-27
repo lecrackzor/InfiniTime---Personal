@@ -31,6 +31,7 @@ void MotorController::StartRinging() {
 
 void MotorController::StopRinging() {
   xTimerStop(longVib, 0);
+  xTimerStop(shortVib, 0);
   nrf_gpio_pin_set(PinMap::Motor);
 }
 

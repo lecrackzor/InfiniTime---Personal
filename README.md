@@ -30,6 +30,9 @@ Kept: Stopwatch, Alarm, Timer, Steps, Heart Rate, Music, Navigation, Calculator,
 ### Bug fixes
 - Timer: screen can sleep again after tapping **Reset** during the ring ([upstream #2419](https://github.com/InfiniTimeOrg/InfiniTime/issues/2419))
 - Alarm: dismissing a ringing alarm returns to the previous screen instead of the editable alarm config ([upstream #2405](https://github.com/InfiniTimeOrg/InfiniTime/issues/2405))
+- Notifications no longer interrupt a ringing alarm/timer or the flashlight ([upstream #1223](https://github.com/InfiniTimeOrg/InfiniTime/issues/1223) / [#610](https://github.com/InfiniTimeOrg/InfiniTime/issues/610))
+- Motor: `StopRinging()` also cancels any pending short vibration pulse
+- HR: charging pause clears stale BPM; HR task queue send is ISR-safe when called from task context
 
 ### InfiniSim
 Local InfiniSim patches (queue segfault fix + HR charging message enums) live in [`tools/infinisim-patches/`](tools/infinisim-patches/). Prefer keeping them on a personal InfiniSim fork once created.
