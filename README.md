@@ -19,6 +19,9 @@ Personal [InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime) fork for the 
 - Weather-focused layout: date and day on the left; icon, temperature, and daily low/high on the right (replaces week number / day-of-year)
 - Long-press overlay: cycle face color (paintbrush) and step display brightness
 - Top status bar shows a bell when the alarm is enabled
+- **One flash font:** only `7segments_115` is loaded from SPI for the big time; date/day/temp use the built-in JetBrains Mono Bold 20, freeing RAM for PPGv2
+
+![Casio Custom one-font InfiniSim preview](doc/personal/casio-custom-one-font.png)
 
 ### Apps
 Removed from the default app list:

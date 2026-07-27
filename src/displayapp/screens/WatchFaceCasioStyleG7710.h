@@ -124,8 +124,6 @@ namespace Pinetime {
         const Controllers::AlarmController& alarmController;
 
         lv_task_t* taskRefresh;
-        lv_font_t* font_dot40 = nullptr;
-        lv_font_t* font_segment40 = nullptr;
         lv_font_t* font_segment115 = nullptr;
         TickType_t colorMenuTick = 0;
       };

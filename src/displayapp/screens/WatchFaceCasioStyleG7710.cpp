@@ -57,17 +57,9 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
     brightnessController {brightnessController},
     alarmController {alarmController} {
 
+  // Single flash font for RAM headroom with PPGv2 — hero time stays 7-segment;
+  // date / day / temp use the built-in JetBrains Bold 20 already linked in firmware.
   lfs_file f = {};
-  if (filesystem.FileOpen(&f, "/fonts/lv_font_dots_40.bin", LFS_O_RDONLY) >= 0) {
-    filesystem.FileClose(&f);
-    font_dot40 = lv_font_load("F:/fonts/lv_font_dots_40.bin");
-  }
-
-  if (filesystem.FileOpen(&f, "/fonts/7segments_40.bin", LFS_O_RDONLY) >= 0) {
-    filesystem.FileClose(&f);
-    font_segment40 = lv_font_load("F:/fonts/7segments_40.bin");
-  }
-
   if (filesystem.FileOpen(&f, "/fonts/7segments_115.bin", LFS_O_RDONLY) >= 0) {
     filesystem.FileClose(&f);
     font_segment115 = lv_font_load("F:/fonts/7segments_115.bin");
@@ -106,23 +98,23 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
   label_date = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_align(label_date, lv_scr_act(), LV_ALIGN_IN_TOP_LEFT, 5, 22);
   lv_obj_set_style_local_text_color(label_date, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_font(label_date, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, font_segment40);
+  lv_obj_set_style_local_text_font(label_date, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &jetbrains_mono_bold_20);
   lv_label_set_text_static(label_date, "6-30");
 
   label_day_of_week = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_align(label_day_of_week, lv_scr_act(), LV_ALIGN_IN_TOP_LEFT, 10, 64);
   lv_obj_set_style_local_text_color(label_day_of_week, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_font(label_day_of_week, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, font_dot40);
+  lv_obj_set_style_local_text_font(label_day_of_week, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &jetbrains_mono_bold_20);
   lv_label_set_text_static(label_day_of_week, "SUN");
 
   label_temperature_unit = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_set_style_local_text_color(label_temperature_unit, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_font(label_temperature_unit, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, font_dot40);
+  lv_obj_set_style_local_text_font(label_temperature_unit, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &jetbrains_mono_bold_20);
   lv_label_set_text_static(label_temperature_unit, "");
 
   label_temperature = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_set_style_local_text_color(label_temperature, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_font(label_temperature, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, font_segment40);
+  lv_obj_set_style_local_text_font(label_temperature, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &jetbrains_mono_bold_20);
   lv_label_set_text_static(label_temperature, "");
 
   label_weather_icon = lv_label_create(lv_scr_act(), nullptr);
@@ -246,14 +238,6 @@ WatchFaceCasioStyleG7710::~WatchFaceCasioStyleG7710() {
 
   lv_style_reset(&style_line);
   lv_style_reset(&style_border);
-
-  if (font_dot40 != nullptr) {
-    lv_font_free(font_dot40);
-  }
-
-  if (font_segment40 != nullptr) {
-    lv_font_free(font_segment40);
-  }
 
   if (font_segment115 != nullptr) {
     lv_font_free(font_segment115);
@@ -498,16 +482,6 @@ void WatchFaceCasioStyleG7710::Refresh() {
 bool WatchFaceCasioStyleG7710::IsAvailable(Pinetime::Controllers::FS& filesystem) {
   lfs_file file = {};
 
-  if (filesystem.FileOpen(&file, "/fonts/lv_font_dots_40.bin", LFS_O_RDONLY) < 0) {
-    return false;
-  }
-
-  filesystem.FileClose(&file);
-  if (filesystem.FileOpen(&file, "/fonts/7segments_40.bin", LFS_O_RDONLY) < 0) {
-    return false;
-  }
-
-  filesystem.FileClose(&file);
   if (filesystem.FileOpen(&file, "/fonts/7segments_115.bin", LFS_O_RDONLY) < 0) {
     return false;
   }
