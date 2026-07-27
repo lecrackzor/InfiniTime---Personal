@@ -31,8 +31,9 @@
 
 #include "drivers/Watchdog.h"
 #include "systemtask/Messages.h"
+#include "components/persistence/RebootPersist.h"
 
-extern std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds> NoInit_BackUpTime;
+extern volatile Pinetime::Components::RebootPersist NoInit_Persistence;
 
 namespace Pinetime {
   namespace Drivers {

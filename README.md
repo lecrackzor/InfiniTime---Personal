@@ -37,12 +37,16 @@ Kept: Stopwatch, Alarm, Timer, Steps, Heart Rate, Music, Navigation, Calculator,
 - BLE FS: `WriteResponse.status` always initialized (success and failure); oversize path early-outs release the file-transfer wake lock ([upstream #2457](https://github.com/InfiniTimeOrg/InfiniTime/issues/2457))
 - BLE CTS: initialize `dayofweek` and `reason` on current-time reads ([upstream #2459](https://github.com/InfiniTimeOrg/InfiniTime/pull/2459))
 - SPI: chunk EasyDMA reads to ≤255 bytes (same limit as writes) ([upstream #2391](https://github.com/InfiniTimeOrg/InfiniTime/pull/2391))
+- FS: serialize littlefs with a recursive mutex across tasks ([upstream #2449](https://github.com/InfiniTimeOrg/InfiniTime/pull/2449))
+- Persist time + steps across soft reboots via noinit RAM ([upstream #2400](https://github.com/InfiniTimeOrg/InfiniTime/pull/2400) / [#2293](https://github.com/InfiniTimeOrg/InfiniTime/issues/2293))
+- DisplayApp: no-op `LVGL_GUARD` hooks for InfiniSim thread-safety ([upstream #2447](https://github.com/InfiniTimeOrg/InfiniTime/pull/2447))
 - Weather: equality compares `minTemperature` to `minTemperature` (was wrongly vs `max`)
 - DateTime: compile-time fallback year set after logger init ([upstream #2396](https://github.com/InfiniTimeOrg/InfiniTime/issues/2396))
 - DateTime: `to_time_t` cast compatible with libc++ ([upstream #2456](https://github.com/InfiniTimeOrg/InfiniTime/pull/2456))
 - GPIOTE: button + touch use high-accuracy sensing so edges are not dropped while both IRQs are live ([upstream #2346](https://github.com/InfiniTimeOrg/InfiniTime/issues/2346))
 - DisplayApp: `TouchEvent` queue send is non-blocking (same deadlock avoidance as notifications) ([upstream #2290](https://github.com/InfiniTimeOrg/InfiniTime/issues/2290) / [#2124](https://github.com/InfiniTimeOrg/InfiniTime/issues/2124))
 - Stopwatch: rebuild lap list in one buffer instead of repeated `lv_label_ins_text` (reduces LVGL churn under mash)
+- Docker: ensure `build.sh` is executable in the image ([upstream #2367](https://github.com/InfiniTimeOrg/InfiniTime/pull/2367))
 
 ### InfiniSim
 Local InfiniSim patches (queue segfault fix + HR charging message enums) live in [`tools/infinisim-patches/`](tools/infinisim-patches/). Prefer keeping them on a personal InfiniSim fork once created.
