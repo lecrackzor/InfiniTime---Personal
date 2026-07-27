@@ -256,21 +256,11 @@ void HeartRateTask::StopMeasurement() {
 void HeartRateTask::HandleSensorData() {
   auto sensorData = heartRateSensor.ReadHrsAls();
   auto motionValues = motionSensor.Process();
-  // Sensor starting up
-  if (sensorData.hrs == 0) {
-    return;
-  }
 
-  // If there are large discontinuities in the heart rate signal, scale the heart rate signal filter
-  // These discontinuities will be due to sensor gain or drive changes
-  static constexpr float discontinuityThreshold = 0.2f;
-  if (lastHrs != 0 && std::abs(static_cast<int32_t>(sensorData.hrs) - static_cast<int32_t>(lastHrs)) >
-                        std::min(lastHrs, sensorData.hrs) * discontinuityThreshold) {
-    ppg.ScaleHrs(static_cast<float>(sensorData.hrs) / static_cast<float>(lastHrs));
-  }
-  lastHrs = sensorData.hrs;
-  ppg.Ingest(sensorData.hrs, motionValues.x, motionValues.y, motionValues.z);
-
+  // Always run AGC / no-touch — even when hrs is 0.
+  // Skipping AutoGain on hrs==0 (old "sensor starting up" early-return) left NoTouch
+  // unable to progress and skipped the background time-limit, so the green LED could
+  // keep sampling forever off-wrist (see upstream #2371 discussion with tituscmd).
   auto ppgState = heartRateSensor.AutoGain(sensorData.hrs, sensorData.als);
 
   std::optional<uint8_t> bpm = std::nullopt;
@@ -280,7 +270,16 @@ void HeartRateTask::HandleSensorData() {
     ppg.Reset();
     lastHrs = 0;
     SendHeartRate(ControllerStates::NotEnoughData, 0);
-  } else if (ppgState == Drivers::Hrs3300::PPGState::Running) {
+  } else if (ppgState == Drivers::Hrs3300::PPGState::Running && sensorData.hrs != 0) {
+    // hrs==0 while "Running" is still treated as startup — don't feed the adaptive filter.
+    static constexpr float discontinuityThreshold = 0.2f;
+    if (lastHrs != 0 && std::abs(static_cast<int32_t>(sensorData.hrs) - static_cast<int32_t>(lastHrs)) >
+                          std::min(lastHrs, sensorData.hrs) * discontinuityThreshold) {
+      ppg.ScaleHrs(static_cast<float>(sensorData.hrs) / static_cast<float>(lastHrs));
+    }
+    lastHrs = sensorData.hrs;
+    ppg.Ingest(sensorData.hrs, motionValues.x, motionValues.y, motionValues.z);
+
     bpm = ppg.HeartRate();
     if (bpm.has_value()) {
       SendHeartRate(ControllerStates::Ready, bpm.value());
@@ -296,6 +295,7 @@ void HeartRateTask::HandleSensorData() {
       }
     }
   }
+
   if (bpm.has_value()) {
     // Maintain constant frequency acquisition in background mode
     // If the last measurement time is set to the start time, then the next measurement
@@ -309,7 +309,7 @@ void HeartRateTask::HandleSensorData() {
     return;
   }
   // If been measuring for longer than the time limit, set the last measurement time
-  // This allows giving up on background measurement after a while
+  // This allows giving up on background measurement after a while (including NoTouch / hrs==0)
   // and also means that background measurement won't begin immediately after
   // an unsuccessful long foreground measurement
   if (xTaskGetTickCount() - measurementStartTime > backgroundMeasurementTimeLimit) {

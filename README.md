@@ -12,6 +12,7 @@ Personal [InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime) fork for the 
 - Pauses while charging; resumes when unplugged
 - Watch faces no longer show a bogus `0` BPM while measuring / waiting for a valid sample
 - **PPGv2** heart-rate algorithm ([upstream #2371](https://github.com/InfiniTimeOrg/InfiniTime/pull/2371)): motion-adaptive filtering, auto gain/drive, reports failure instead of wrong BPM
+- PPGv2: still run AGC / background timeout when `hrs == 0` so off-wrist no-touch cannot spin the green LED forever
 
 ### Casio Custom watchface
 - Renamed from **Casio Style G7710** to **Casio Custom**
