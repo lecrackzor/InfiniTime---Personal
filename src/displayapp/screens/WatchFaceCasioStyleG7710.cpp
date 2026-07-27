@@ -18,6 +18,7 @@
 #include "components/ble/SimpleWeatherService.h"
 #include "components/brightness/BrightnessController.h"
 #include "components/settings/Settings.h"
+#include "components/alarm/AlarmController.h"
 
 using namespace Pinetime::Applications::Screens;
 
@@ -40,7 +41,8 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
                                                    Controllers::MotionController& motionController,
                                                    Controllers::SimpleWeatherService& weatherService,
                                                    Controllers::BrightnessController& brightnessController,
-                                                   Controllers::FS& filesystem)
+                                                   Controllers::FS& filesystem,
+                                                   const Controllers::AlarmController& alarmController)
   : currentDateTime {{}},
     color_text {Convert(settingsController.GetCasioColor())},
     batteryIcon(false),
@@ -52,7 +54,8 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
     heartRateController {heartRateController},
     motionController {motionController},
     weatherService {weatherService},
-    brightnessController {brightnessController} {
+    brightnessController {brightnessController},
+    alarmController {alarmController} {
 
   lfs_file f = {};
   if (filesystem.FileOpen(&f, "/fonts/lv_font_dots_40.bin", LFS_O_RDONLY) >= 0) {
@@ -89,10 +92,16 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
   lv_label_set_text_static(bleIcon, Symbols::bluetooth);
   lv_obj_align(bleIcon, batteryPlug, LV_ALIGN_OUT_LEFT_MID, -5, 0);
 
+  alarmIcon = lv_label_create(lv_scr_act(), nullptr);
+  lv_obj_set_style_local_text_color(alarmIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_label_set_text_static(alarmIcon, Symbols::bell);
+  lv_obj_align(alarmIcon, bleIcon, LV_ALIGN_OUT_LEFT_MID, -5, 0);
+  lv_obj_set_hidden(alarmIcon, !alarmController.IsEnabled());
+
   notificationIcon = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_set_style_local_text_color(notificationIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_label_set_text_static(notificationIcon, NotificationIcon::GetIcon(false));
-  lv_obj_align(notificationIcon, bleIcon, LV_ALIGN_OUT_LEFT_MID, -5, 0);
+  lv_obj_align(notificationIcon, alarmIcon, LV_ALIGN_OUT_LEFT_MID, -5, 0);
 
   label_date = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_align(label_date, lv_scr_act(), LV_ALIGN_IN_TOP_LEFT, 5, 22);
@@ -260,6 +269,7 @@ void WatchFaceCasioStyleG7710::ApplyColor(lv_color_t color) {
   batteryIcon.SetColor(color_text);
   lv_obj_set_style_local_text_color(batteryPlug, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_color(bleIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_color(alarmIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_color(notificationIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_color(label_date, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_color(label_day_of_week, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
@@ -367,10 +377,17 @@ void WatchFaceCasioStyleG7710::Refresh() {
   if (bleState.IsUpdated() || bleRadioEnabled.IsUpdated()) {
     lv_label_set_text_static(bleIcon, BleIcon::GetIcon(bleState.Get()));
   }
+
+  alarmEnabled = alarmController.IsEnabled();
+  if (alarmEnabled.IsUpdated()) {
+    lv_obj_set_hidden(alarmIcon, !alarmEnabled.Get());
+  }
+
   lv_obj_realign(label_battery_value);
   lv_obj_realign(batteryIcon.GetObject());
   lv_obj_realign(batteryPlug);
   lv_obj_realign(bleIcon);
+  lv_obj_realign(alarmIcon);
   lv_obj_realign(notificationIcon);
 
   notificationState = notificatioManager.AreNewNotificationsAvailable();
@@ -451,11 +468,12 @@ void WatchFaceCasioStyleG7710::Refresh() {
   }
 
   heartbeat = heartRateController.HeartRate();
-  heartbeatRunning = heartRateController.State() != Controllers::HeartRateController::States::Stopped;
+  heartbeatRunning = heartRateController.State() != Controllers::HeartRateController::States::Disabled;
   if (heartbeat.IsUpdated() || heartbeatRunning.IsUpdated()) {
     if (heartbeatRunning.Get()) {
       lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-      if (heartRateController.State() == Controllers::HeartRateController::States::Running && heartbeat.Get() > 0) {
+      // PPGv2: only show a trusted Ready sample — never a bogus 0 while searching.
+      if (heartRateController.State() == Controllers::HeartRateController::States::Ready && heartbeat.Get() > 0) {
         lv_label_set_text_fmt(heartbeatValue, "%d", heartbeat.Get());
       } else {
         lv_label_set_text_static(heartbeatValue, "");

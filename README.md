@@ -6,26 +6,18 @@ Personal [InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime) fork for the 
 
 ## Changes vs upstream
 
-### Casio Custom watchface
-- Renamed from **Casio Style G7710** to **Casio Custom**
-- Weather-focused layout: date and day on the left; icon, temperature, and daily low/high on the right (replaces week number / day-of-year)
-- Long-press overlay: cycle face color (paintbrush) and step display brightness
-
-### Apps
-Removed from the default app list:
-- Paint
-- Paddle
-- Twos
-- Dice
-- Metronome
-
-Kept: Stopwatch, Alarm, Timer, Steps, Heart Rate, Music, Navigation, Calculator, Weather
-
 ### Heart rate
 - Background interval options: Off, Continuous, 30s, 1m, **3m**, 5m, 10m (removed 30m)
 - **Start** state persists across reboot (so background HR keeps working after power cycle)
 - Pauses while charging; resumes when unplugged
 - Watch faces no longer show a bogus `0` BPM while measuring / waiting for a valid sample
+- **PPGv2** heart-rate algorithm ([upstream #2371](https://github.com/InfiniTimeOrg/InfiniTime/pull/2371)): motion-adaptive filtering, auto gain/drive, reports failure instead of wrong BPM
+
+### Casio Custom watchface
+- Renamed from **Casio Style G7710** to **Casio Custom**
+- Weather-focused layout: date and day on the left; icon, temperature, and daily low/high on the right (replaces week number / day-of-year)
+- Long-press overlay: cycle face color (paintbrush) and step display brightness
+- Top status bar shows a bell when the alarm is enabled
 
 ### Bug fixes
 - Timer: screen can sleep again after tapping **Reset** during the ring ([upstream #2419](https://github.com/InfiniTimeOrg/InfiniTime/issues/2419))

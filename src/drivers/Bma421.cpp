@@ -27,7 +27,7 @@ namespace {
   // from datasheet: https://files.pine64.org/doc/datasheet/pinetime/BST-BMA421-FL000.pdf
   // The array index to use is stored in accel_conf.range
   constexpr int16_t accelScaleFactors[] = {
-    [BMA4_ACCEL_RANGE_2G] = 1024, // LSB/g +/- 2g range
+    [BMA4_ACCEL_RANGE_8G] = 1024, // LSB/g +/- 2g range
     [BMA4_ACCEL_RANGE_4G] = 512,  // LSB/g +/- 4g range
     [BMA4_ACCEL_RANGE_8G] = 256,  // LSB/g +/- 8g range
     [BMA4_ACCEL_RANGE_16G] = 128  // LSB/g +/- 16g range
@@ -85,7 +85,7 @@ void Bma421::Init() {
     return;
 
   accel_conf.odr = BMA4_OUTPUT_DATA_RATE_100HZ;
-  accel_conf.range = BMA4_ACCEL_RANGE_2G;
+  accel_conf.range = BMA4_ACCEL_RANGE_8G;
   accel_conf.bandwidth = BMA4_ACCEL_NORMAL_AVG4;
   accel_conf.perf_mode = BMA4_CIC_AVG_MODE;
   ret = bma4_set_accel_config(&accel_conf, &bma);
