@@ -148,6 +148,9 @@ void SystemTask::Work() {
   heartRateSensor.Init();
   heartRateSensor.Disable();
   heartRateApp.Start();
+  if (batteryController.IsPowerPresent()) {
+    heartRateApp.PushMessage(Pinetime::Applications::HeartRateTask::Messages::PauseForCharging);
+  }
 
   buttonHandler.Init(this);
 
@@ -354,6 +357,11 @@ void SystemTask::Work() {
           break;
         case Messages::OnChargingEvent:
           batteryController.ReadPowerState();
+          if (batteryController.IsPowerPresent()) {
+            heartRateApp.PushMessage(Pinetime::Applications::HeartRateTask::Messages::PauseForCharging);
+          } else {
+            heartRateApp.PushMessage(Pinetime::Applications::HeartRateTask::Messages::ResumeFromCharging);
+          }
           GoToRunning();
           break;
         case Messages::MeasureBatteryTimerExpired:

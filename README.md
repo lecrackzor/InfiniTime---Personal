@@ -23,6 +23,13 @@ Kept: Stopwatch, Alarm, Timer, Steps, Heart Rate, Music, Navigation, Calculator,
 
 ### Heart rate
 - Background interval options: Off, Continuous, 30s, 1m, **3m**, 5m, 10m (removed 30m)
+- **Start** state persists across reboot (so background HR keeps working after power cycle)
+- Pauses while charging; resumes when unplugged
+- Watch faces no longer show a bogus `0` BPM while measuring / waiting for a valid sample
+
+### Bug fixes
+- Timer: screen can sleep again after tapping **Reset** during the ring ([upstream #2419](https://github.com/InfiniTimeOrg/InfiniTime/issues/2419))
+- Alarm: dismissing a ringing alarm returns to the previous screen instead of the editable alarm config ([upstream #2405](https://github.com/InfiniTimeOrg/InfiniTime/issues/2405))
 
 ## Upstream
 

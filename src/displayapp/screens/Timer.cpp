@@ -196,6 +196,7 @@ void Timer::ToggleRunning() {
 }
 
 void Timer::Reset() {
+  wakeLock.Release();
   timer.ResetExpiredTime();
   DisplayTime();
   SetTimerStopped();

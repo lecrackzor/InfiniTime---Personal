@@ -216,18 +216,13 @@ void Alarm::SetAlerting() {
 void Alarm::StopAlerting() {
   alarmController.StopAlerting();
   motorController.StopRinging();
-  SetSwitchState(LV_ANIM_OFF);
   if (taskStopAlarm != nullptr) {
     lv_task_del(taskStopAlarm);
     taskStopAlarm = nullptr;
   }
   wakeLock.Release();
-  lv_obj_set_hidden(btnStop, true);
-  hourCounter.ShowControls();
-  minuteCounter.ShowControls();
-  lv_obj_set_hidden(btnInfo, false);
-  lv_obj_set_hidden(btnRecur, false);
-  lv_obj_set_hidden(enableSwitch, false);
+  // Leave the Alarm app after dismiss so the config UI cannot be edited accidentally.
+  running = false;
 }
 
 void Alarm::SetSwitchState(lv_anim_enable_t anim) {

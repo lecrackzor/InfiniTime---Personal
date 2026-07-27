@@ -143,7 +143,11 @@ void WatchFaceTerminal::Refresh() {
   if (heartbeat.IsUpdated() || heartbeatRunning.IsUpdated()) {
     if (heartbeatRunning.Get()) {
       lv_obj_set_style_local_text_color(heartbeatValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, Colors::deepOrange);
-      lv_label_set_text_fmt(heartbeatValue, "#ffffff [L_HR]# %d bpm", heartbeat.Get());
+      if (heartRateController.State() == Controllers::HeartRateController::States::Running && heartbeat.Get() > 0) {
+        lv_label_set_text_fmt(heartbeatValue, "#ffffff [L_HR]# %d bpm", heartbeat.Get());
+      } else {
+        lv_label_set_text_static(heartbeatValue, "#ffffff [L_HR]# ---");
+      }
     } else {
       lv_label_set_text_static(heartbeatValue, "#ffffff [L_HR]# ---");
       lv_obj_set_style_local_text_color(heartbeatValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, Colors::gray);

@@ -20,6 +20,9 @@ std::optional<TickType_t> HeartRateTask::BackgroundMeasurementInterval() const {
 }
 
 bool HeartRateTask::BackgroundMeasurementNeeded() const {
+  if (pausedByCharging) {
+    return false;
+  }
   auto backgroundPeriod = BackgroundMeasurementInterval();
   if (!backgroundPeriod.has_value()) {
     return false;
@@ -65,8 +68,8 @@ TickType_t HeartRateTask::CurrentTaskDelay() {
     case States::Disabled:
       return portMAX_DELAY;
     case States::Waiting:
-      // Sleep until a new event if background measuring disabled
-      if (!backgroundPeriod.has_value()) {
+      // Sleep until a new event if background measuring disabled or paused for charging
+      if (pausedByCharging || !backgroundPeriod.has_value()) {
         return portMAX_DELAY;
       }
       // Sleep until the next background measurement
@@ -96,6 +99,10 @@ void HeartRateTask::Start() {
 
   if (pdPASS != xTaskCreate(HeartRateTask::Process, "Heartrate", 500, this, 1, &taskHandle)) {
     APP_ERROR_HANDLER(NRF_ERROR_NO_MEM);
+  }
+
+  if (settings.GetHeartRateEnabledOnBoot()) {
+    controller.Enable();
   }
 }
 
@@ -135,17 +142,43 @@ void HeartRateTask::Work() {
           if (state == States::Disabled) {
             break;
           }
-          newState = States::ForegroundMeasuring;
+          if (pausedByCharging) {
+            newState = States::Waiting;
+          } else {
+            newState = States::ForegroundMeasuring;
+          }
           break;
         case Messages::Enable:
+          settings.SetHeartRateEnabledOnBoot(true);
+          settings.SaveSettings();
+          valueCurrentlyShown = false;
           // Can only be enabled when the screen is on
           // If this constraint is somehow violated, the unexpected state
           // will self-resolve at the next screen on event
-          newState = States::ForegroundMeasuring;
-          valueCurrentlyShown = false;
+          if (pausedByCharging) {
+            newState = States::Waiting;
+          } else {
+            newState = States::ForegroundMeasuring;
+          }
           break;
         case Messages::Disable:
+          settings.SetHeartRateEnabledOnBoot(false);
+          settings.SaveSettings();
           newState = States::Disabled;
+          break;
+        case Messages::PauseForCharging:
+          pausedByCharging = true;
+          if (state == States::ForegroundMeasuring || state == States::BackgroundMeasuring) {
+            newState = States::Waiting;
+          }
+          break;
+        case Messages::ResumeFromCharging:
+          pausedByCharging = false;
+          if (state == States::Disabled) {
+            break;
+          }
+          // Prefer waiting; WakeUp from GoToRunning (charging unplug wakes the watch) will raise to foreground
+          newState = States::Waiting;
           break;
       }
     }
@@ -211,9 +244,8 @@ void HeartRateTask::HandleSensorData() {
   if (bpm == -1) {
     // Reset all DAQ buffers except HRS buffer
     ppg.Reset(false);
-    // Set HR to zero and update
     bpm = 0;
-    controller.Update(Controllers::HeartRateController::States::Running, bpm);
+    controller.Update(Controllers::HeartRateController::States::NotEnoughData, bpm);
     valueCurrentlyShown = false;
   } else if (bpm == -2) {
     // Not enough data
@@ -249,7 +281,7 @@ void HeartRateTask::HandleSensorData() {
     // Note: Once a successful measurement is recorded in screen on it will never be cleared
     // without some other state change e.g. ambient light reset
     if (!measurementSucceeded) {
-      controller.Update(Controllers::HeartRateController::States::Running, 0);
+      controller.Update(Controllers::HeartRateController::States::NotEnoughData, 0);
       valueCurrentlyShown = false;
     }
     if (state == States::BackgroundMeasuring) {
