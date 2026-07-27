@@ -53,6 +53,15 @@ Kept: Stopwatch, Alarm, Timer, Steps, Heart Rate, Music, Navigation, Calculator,
 - Stopwatch: lap labels wrap in 1..999 (0 is empty-slot sentinel, so `% 1000` made laps vanish)
 - Notifications: `GetPrevious` bounds against valid count, not buffer capacity
 - Notifications: drop exact duplicates already in the ring buffer (common companion double-send)
+- Notifications: FS/DFU deny alerts also gate `OnNewNotification` on `PushIfNew` (no re-vibe on spam)
+- Notifications: don't rebuild the preview screen when already previewing (avoids re-vibe + timeout reset)
+- Music GATT: register track-number UUID once (was a duplicate total-length characteristic)
+- DateTime: skip `OnNewTime` when CTS pushes an unchanged wall clock (avoids redundant alarm reschedule)
+- Motor: coalesce `StartRinging()` if already ringing
+- Chime: don't reload Clock when already there; don't interrupt ringing timer/alarm/call/flashlight
+- Pairing: update passkey in place instead of rebuilding PassKey
+- Charging: ignore duplicate power-present edges; HR pause/resume only transitions once
+- Alarm: coalesce `SetOffAlarmNow` / don't leak a second auto-stop LVGL task while alerting
 - CI: set `REF_NAME` in the InfiniSim job so artifacts are not named `infinitisim-` ([upstream #2223](https://github.com/InfiniTimeOrg/InfiniTime/issues/2223))
 
 ### InfiniSim

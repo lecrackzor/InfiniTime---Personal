@@ -7,10 +7,6 @@ using namespace Pinetime::Controllers;
 
 constexpr uint8_t NotificationManager::MessageSize;
 
-void NotificationManager::Push(NotificationManager::Notification&& notif) {
-  (void) PushIfNew(std::move(notif));
-}
-
 bool NotificationManager::PushIfNew(NotificationManager::Notification&& notif) {
   // Companions (especially Gadgetbridge) sometimes deliver the same alert twice.
   // Drop exact duplicates already in the ring buffer so the list and preview stay clean.

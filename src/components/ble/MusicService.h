@@ -66,7 +66,7 @@ namespace Pinetime {
       enum MusicStatus { NotPlaying = 0x00, Playing = 0x01 };
 
     private:
-      struct ble_gatt_chr_def characteristicDefinition[14];
+      struct ble_gatt_chr_def characteristicDefinition[13];
       struct ble_gatt_svc_def serviceDefinition[2];
 
       uint16_t eventHandle {};

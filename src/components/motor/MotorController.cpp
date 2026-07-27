@@ -25,6 +25,9 @@ void MotorController::RunForDuration(uint8_t motorDuration) {
 }
 
 void MotorController::StartRinging() {
+  if (IsRinging()) {
+    return;
+  }
   RunForDuration(50);
   xTimerStart(longVib, 0);
 }

@@ -202,6 +202,12 @@ void Alarm::UpdateAlarmTime() {
 }
 
 void Alarm::SetAlerting() {
+  // A second AlarmTriggered while already alerting must not create another auto-stop task.
+  if (taskStopAlarm != nullptr) {
+    motorController.StartRinging();
+    wakeLock.Lock();
+    return;
+  }
   lv_obj_set_hidden(enableSwitch, true);
   lv_obj_set_hidden(btnRecur, true);
   lv_obj_set_hidden(btnInfo, true);

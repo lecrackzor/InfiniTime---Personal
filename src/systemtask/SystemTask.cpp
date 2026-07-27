@@ -357,15 +357,22 @@ void SystemTask::Work() {
             displayApp.PushMessage(Pinetime::Applications::Display::Messages::Chime);
           }
           break;
-        case Messages::OnChargingEvent:
+        case Messages::OnChargingEvent: {
+          const bool wasPowerPresent = batteryController.IsPowerPresent();
           batteryController.ReadPowerState();
-          if (batteryController.IsPowerPresent()) {
+          const bool isPowerPresent = batteryController.IsPowerPresent();
+          // Debounced GPIO can re-fire; skip wake/HR churn when the plug state is unchanged.
+          if (wasPowerPresent == isPowerPresent) {
+            break;
+          }
+          if (isPowerPresent) {
             heartRateApp.PushMessage(Pinetime::Applications::HeartRateTask::Messages::PauseForCharging);
           } else {
             heartRateApp.PushMessage(Pinetime::Applications::HeartRateTask::Messages::ResumeFromCharging);
           }
           GoToRunning();
           break;
+        }
         case Messages::MeasureBatteryTimerExpired:
           batteryController.MeasureVoltage();
           break;

@@ -38,9 +38,12 @@ namespace Pinetime {
         const char* Title() const;
       };
 
-      void Push(Notification&& notif);
       /// Returns false if the notification was a duplicate of one already stored.
-      bool PushIfNew(Notification&& notif);
+      [[nodiscard]] bool PushIfNew(Notification&& notif);
+      /// Prefer PushIfNew so callers can skip duplicate OnNewNotification events.
+      [[nodiscard]] bool Push(Notification&& notif) {
+        return PushIfNew(std::move(notif));
+      }
       Notification GetLastNotification() const;
       Notification Get(Notification::Id id) const;
       Notification GetNext(Notification::Id id) const;

@@ -44,12 +44,19 @@ void DateTime::SetTime(uint16_t year, uint8_t month, uint8_t day, uint8_t hour, 
 
   tm.tm_isdst = -1; // Use DST value from local time zone
 
+  const auto newDateTime = std::chrono::system_clock::from_time_t(std::mktime(&tm));
+
   xSemaphoreTake(mutex, portMAX_DELAY);
-  currentDateTime = std::chrono::system_clock::from_time_t(std::mktime(&tm));
-  UpdateTime(previousSystickCounter, true);
+  // Compare at second resolution — companions often re-push the same CTS value on connect.
+  const bool timeChanged =
+    std::chrono::time_point_cast<std::chrono::seconds>(currentDateTime) != std::chrono::time_point_cast<std::chrono::seconds>(newDateTime);
+  if (timeChanged) {
+    currentDateTime = newDateTime;
+    UpdateTime(previousSystickCounter, true);
+  }
   xSemaphoreGive(mutex);
 
-  if (systemTask != nullptr) {
+  if (timeChanged && systemTask != nullptr) {
     systemTask->PushMessage(System::Messages::OnNewTime);
   }
 }

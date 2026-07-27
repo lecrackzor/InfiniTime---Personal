@@ -118,6 +118,9 @@ void AlarmController::DisableAlarm() {
 }
 
 void AlarmController::SetOffAlarmNow() {
+  if (isAlerting) {
+    return;
+  }
   isAlerting = true;
   systemTask->PushMessage(System::Messages::SetOffAlarm);
 }

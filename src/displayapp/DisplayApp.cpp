@@ -382,6 +382,11 @@ void DisplayApp::Refresh() {
         if (alarmController.IsAlerting() || timerRinging || currentApp == Apps::FlashLight) {
           break;
         }
+        // Already previewing — don't tear down/rebuild (re-vibrates and resets the timeout).
+        // Newest alert is already in NotificationManager for the list / next open.
+        if (currentApp == Apps::NotificationsPreview) {
+          break;
+        }
         LoadNewScreen(Apps::NotificationsPreview, DisplayApp::FullRefreshDirections::Down);
         break;
       }
@@ -409,7 +414,11 @@ void DisplayApp::Refresh() {
         }
         break;
       case Messages::ShowPairingKey:
-        LoadNewScreen(Apps::PassKey, DisplayApp::FullRefreshDirections::Up);
+        if (currentApp == Apps::PassKey) {
+          static_cast<Screens::PassKey*>(currentScreen.get())->UpdateKey(bleController.GetPairingKey());
+        } else {
+          LoadNewScreen(Apps::PassKey, DisplayApp::FullRefreshDirections::Up);
+        }
         motorController.RunForDuration(35);
         break;
       case Messages::TouchEvent: {
@@ -497,10 +506,21 @@ void DisplayApp::Refresh() {
       case Messages::BleRadioEnableToggle:
         PushMessageToSystemTask(System::Messages::BleRadioEnableToggle);
         break;
-      case Messages::Chime:
-        LoadNewScreen(Apps::Clock, DisplayApp::FullRefreshDirections::None);
+      case Messages::Chime: {
+        // Don't tear down a ringing timer/alarm, call preview, or flashlight — LoadScreen
+        // always StopRinging(), which would kill the active alert vibration.
+        auto timerStatus = timer.GetTimerState();
+        const bool timerRinging = timerStatus && timerStatus->expired;
+        if (alarmController.IsAlerting() || timerRinging || currentApp == Apps::FlashLight ||
+            currentApp == Apps::NotificationsPreview) {
+          break;
+        }
+        if (currentApp != Apps::Clock) {
+          LoadNewScreen(Apps::Clock, DisplayApp::FullRefreshDirections::None);
+        }
         motorController.RunForDuration(35);
         break;
+      }
     }
   }
 

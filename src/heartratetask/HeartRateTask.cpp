@@ -171,6 +171,9 @@ void HeartRateTask::Work() {
           newState = States::Disabled;
           break;
         case Messages::PauseForCharging:
+          if (pausedByCharging) {
+            break;
+          }
           pausedByCharging = true;
           if (state == States::ForegroundMeasuring || state == States::BackgroundMeasuring) {
             newState = States::Waiting;
@@ -180,6 +183,9 @@ void HeartRateTask::Work() {
           valueCurrentlyShown = false;
           break;
         case Messages::ResumeFromCharging:
+          if (!pausedByCharging) {
+            break;
+          }
           pausedByCharging = false;
           if (state == States::Disabled) {
             break;

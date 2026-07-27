@@ -86,8 +86,9 @@ int DfuService::OnServiceData(uint16_t connectionHandle, uint16_t attributeHandl
     memcpy(notif.message.data(), denyAlert, denyAlertLength);
     notif.size = denyAlertLength;
     notif.category = Pinetime::Controllers::NotificationManager::Categories::SimpleAlert;
-    systemTask.GetNotificationManager().Push(std::move(notif));
-    systemTask.PushMessage(Pinetime::System::Messages::OnNewNotification);
+    if (systemTask.GetNotificationManager().PushIfNew(std::move(notif))) {
+      systemTask.PushMessage(Pinetime::System::Messages::OnNewNotification);
+    }
     return BLE_ATT_ERR_INSUFFICIENT_AUTHOR;
   }
 #endif

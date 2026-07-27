@@ -14,3 +14,7 @@ PassKey::PassKey(uint32_t key) {
 PassKey::~PassKey() {
   lv_obj_clean(lv_scr_act());
 }
+
+void PassKey::UpdateKey(uint32_t key) {
+  lv_label_set_text_fmt(passkeyLabel, "%06u", key);
+}
