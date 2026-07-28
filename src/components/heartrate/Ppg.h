@@ -89,6 +89,8 @@ namespace Pinetime {
 
       // First harmonic minimum relative magnitude to be considered
       static constexpr float f1MagMinimum = 0.5f;
+      // When |2f| exceeds |f|, treat f as a subharmonic of the true rate
+      static constexpr float subharmonicPenalty = 0.05f;
       // First harmonic phase penalty exponent
       static constexpr float f1ExpAttenuationFactor = 4.f;
       // First harmonic magnitude high threshold

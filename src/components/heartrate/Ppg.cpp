@@ -353,6 +353,11 @@ void Ppg::HarmonicFilter() {
     if (f2MagRel > f2MagHigh) {
       filteredEnergy = std::min(filteredEnergy, fnMagHighEnergyCeiling);
     }
+    // Real PPG fundamentals have a weaker first harmonic (~0.3–0.4×). If 2f is stronger
+    // than f, this bin is almost certainly half the true rate — crush it.
+    if (f1Mag > f0Mag) {
+      filteredEnergy *= subharmonicPenalty;
+    }
     fftArray[frequencyBin] = filteredEnergy;
   }
 }

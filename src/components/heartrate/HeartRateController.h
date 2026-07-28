@@ -22,6 +22,8 @@ namespace Pinetime {
       void Disable();
       void UpdateState(States newState);
       void UpdateHeartRate(uint8_t heartRate);
+      // Notify BLE without changing the value shown on the watch face.
+      void ReportHeartRateToService(uint8_t heartRate);
 
       void SetHeartRateTask(Applications::HeartRateTask* task);
 
@@ -36,9 +38,12 @@ namespace Pinetime {
       void SetService(Pinetime::Controllers::HeartRateService* service);
 
     private:
+      void NotifyServiceIfChanged(uint8_t heartRate);
+
       Applications::HeartRateTask* task = nullptr;
       States state = States::Disabled;
       uint8_t heartRate = 0;
+      uint8_t lastReportedHeartRate = 0;
       Pinetime::Controllers::HeartRateService* service = nullptr;
     };
   }

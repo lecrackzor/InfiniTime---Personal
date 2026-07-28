@@ -9,13 +9,23 @@ void HeartRateController::UpdateState(HeartRateController::States newState) {
   this->state = newState;
 }
 
-void HeartRateController::UpdateHeartRate(uint8_t heartRate) {
-  if (this->heartRate != heartRate) {
-    this->heartRate = heartRate;
-    if (service != nullptr) {
-      service->OnNewHeartRateValue(heartRate);
-    }
+void HeartRateController::NotifyServiceIfChanged(uint8_t heartRate) {
+  if (lastReportedHeartRate == heartRate) {
+    return;
   }
+  lastReportedHeartRate = heartRate;
+  if (service != nullptr) {
+    service->OnNewHeartRateValue(heartRate);
+  }
+}
+
+void HeartRateController::UpdateHeartRate(uint8_t heartRate) {
+  this->heartRate = heartRate;
+  NotifyServiceIfChanged(heartRate);
+}
+
+void HeartRateController::ReportHeartRateToService(uint8_t heartRate) {
+  NotifyServiceIfChanged(heartRate);
 }
 
 void HeartRateController::Enable() {

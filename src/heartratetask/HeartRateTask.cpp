@@ -270,35 +270,48 @@ void HeartRateTask::HandleSensorData() {
     ppg.Reset();
     lastHrs = 0;
     SendHeartRate(ControllerStates::NotEnoughData, 0);
-  } else if (ppgState == Drivers::Hrs3300::PPGState::Running && sensorData.hrs != 0) {
-    // hrs==0 while "Running" is still treated as startup — don't feed the adaptive filter.
-    static constexpr float discontinuityThreshold = 0.2f;
-    if (lastHrs != 0 && std::abs(static_cast<int32_t>(sensorData.hrs) - static_cast<int32_t>(lastHrs)) >
-                          std::min(lastHrs, sensorData.hrs) * discontinuityThreshold) {
-      ppg.ScaleHrs(static_cast<float>(sensorData.hrs) / static_cast<float>(lastHrs));
+  } else if (ppgState == Drivers::Hrs3300::PPGState::Running) {
+    uint16_t hrsSample = 0;
+    if (sensorData.hrs != 0) {
+      static constexpr float discontinuityThreshold = 0.2f;
+      if (lastHrs != 0 && std::abs(static_cast<int32_t>(sensorData.hrs) - static_cast<int32_t>(lastHrs)) >
+                            std::min(lastHrs, sensorData.hrs) * discontinuityThreshold) {
+        ppg.ScaleHrs(static_cast<float>(sensorData.hrs) / static_cast<float>(lastHrs));
+      }
+      lastHrs = sensorData.hrs;
+      hrsSample = sensorData.hrs;
+    } else if (lastHrs != 0) {
+      // hrs==0 while already running is a dropped sample — hold the last good reading so
+      // the FFT keeps a uniform 48 ms timeline (skipping would stretch periods and bias BPM).
+      hrsSample = lastHrs;
     }
-    lastHrs = sensorData.hrs;
-    ppg.Ingest(sensorData.hrs, motionValues.x, motionValues.y, motionValues.z);
 
-    bpm = ppg.HeartRate();
-    if (bpm.has_value()) {
-      SendHeartRate(ControllerStates::Ready, bpm.value());
-    } else if (ppg.SufficientData()) {
-      // Keep last known BPM while re-acquiring — only clear when nothing was shown yet.
-      if (valueCurrentlyShown) {
-        controller.UpdateState(ControllerStates::Searching);
+    if (hrsSample != 0) {
+      ppg.Ingest(hrsSample, motionValues.x, motionValues.y, motionValues.z);
+
+      bpm = ppg.HeartRate();
+      if (bpm.has_value()) {
+        SendHeartRate(ControllerStates::Ready, bpm.value());
+      } else if (ppg.SufficientData()) {
+        // Keep last known BPM on the watch face while re-acquiring, but report 0 over BLE
+        // so Gadgetbridge recording matches pre-hold behaviour.
+        if (valueCurrentlyShown) {
+          controller.UpdateState(ControllerStates::Searching);
+          controller.ReportHeartRateToService(0);
+        } else {
+          SendHeartRate(ControllerStates::Searching, 0);
+        }
       } else {
-        SendHeartRate(ControllerStates::Searching, 0);
-      }
-    } else {
-      // If there's currently a value shown, don't clear it
-      // But still update the algorithm state
-      if (valueCurrentlyShown) {
-        controller.UpdateState(ControllerStates::NotEnoughData);
-      } else {
-        SendHeartRate(ControllerStates::NotEnoughData, 0);
+        // If there's currently a value shown, don't clear it
+        // But still update the algorithm state
+        if (valueCurrentlyShown) {
+          controller.UpdateState(ControllerStates::NotEnoughData);
+        } else {
+          SendHeartRate(ControllerStates::NotEnoughData, 0);
+        }
       }
     }
+    // else: true startup (hrs still 0) — fall through for background timeout / AGC only
   }
 
   if (bpm.has_value()) {
