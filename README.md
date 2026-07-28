@@ -105,7 +105,7 @@ App polish:
 ### InfiniSim
 Companion simulator: [InfiniSim---Personal](https://github.com/lecrackzor/InfiniSim---Personal) (trimmed faces/apps, PPGv2 HR, Warm Cockpit Casio keys).
 
-Apply / refresh helpers still live in [`tools/infinisim-patches/`](tools/infinisim-patches/) (`apply-personal-sim.py`, `run-infinisim.sh`) for rebuilding a local InfiniSim tree against this firmware.
+Sim patches and helpers live in that repo (`tools/run-infinisim.sh`, etc.). Build the sim locally — its GitHub Actions CI is disabled.
 
 ## Upstream
 
