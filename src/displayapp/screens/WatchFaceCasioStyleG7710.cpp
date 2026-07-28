@@ -4,7 +4,6 @@
 #include <cstdio>
 #include <FreeRTOS.h>
 #include <task.h>
-#include "displayapp/Colors.h"
 #include "displayapp/screens/BatteryIcon.h"
 #include "displayapp/screens/BleIcon.h"
 #include "displayapp/screens/NotificationIcon.h"
@@ -27,6 +26,16 @@ extern lv_font_t jetbrains_mono_extrabold_compressed;
 LV_FONT_DECLARE(lv_font_sys_48);
 
 namespace {
+  // Warm Cockpit theme (mockup #9) — role colors on black.
+  constexpr lv_color_t ColorTime = LV_COLOR_MAKE(0xFF, 0xC1, 0x07);      // amber
+  constexpr lv_color_t ColorDate = LV_COLOR_MAKE(0xFF, 0x98, 0x00);      // orange
+  constexpr lv_color_t ColorWeather = LV_COLOR_MAKE(0x80, 0xDE, 0xEA);   // soft cyan
+  constexpr lv_color_t ColorHeart = LV_COLOR_MAKE(0xFF, 0x52, 0x52);     // red
+  constexpr lv_color_t ColorSteps = LV_COLOR_MAKE(0xB2, 0xFF, 0x59);     // lime
+  constexpr lv_color_t ColorLines = LV_COLOR_MAKE(0xC7, 0x91, 0x00);     // dim amber
+  constexpr lv_color_t ColorChrome = LV_COLOR_MAKE(0xC7, 0x91, 0x00);    // status icons
+  constexpr lv_color_t ColorHeartIdle = LV_COLOR_MAKE(0x1B, 0x1B, 0x1B);
+
   void event_handler(lv_obj_t* obj, lv_event_t event) {
     auto* screen = static_cast<WatchFaceCasioStyleG7710*>(obj->user_data);
     screen->OnOverlayButtonEvent(obj, event);
@@ -45,8 +54,7 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
                                                    Controllers::FS& filesystem,
                                                    const Controllers::AlarmController& alarmController)
   : currentDateTime {{}},
-    color_text {Convert(settingsController.GetCasioColor())},
-    batteryIcon(false),
+    batteryIcon(true),
     dateTimeController {dateTimeController},
     batteryController {batteryController},
     bleController {bleController},
@@ -84,68 +92,64 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
 
   label_battery_value = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_align(label_battery_value, lv_scr_act(), LV_ALIGN_IN_TOP_RIGHT, 0, 0);
-  lv_obj_set_style_local_text_color(label_battery_value, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_label_set_text_static(label_battery_value, "00%");
 
   batteryIcon.Create(lv_scr_act());
-  batteryIcon.SetColor(color_text);
   lv_obj_align(batteryIcon.GetObject(), label_battery_value, LV_ALIGN_OUT_LEFT_MID, -5, 0);
+  {
+    const auto batteryPercent = batteryController.PercentRemaining();
+    batteryIcon.SetBatteryPercentage(batteryPercent);
+    lv_obj_set_style_local_text_color(label_battery_value,
+                                      LV_LABEL_PART_MAIN,
+                                      LV_STATE_DEFAULT,
+                                      BatteryIcon::ColorFromPercentage(batteryPercent));
+    lv_label_set_text_fmt(label_battery_value, "%d%%", batteryPercent);
+  }
 
   batteryPlug = lv_label_create(lv_scr_act(), nullptr);
-  lv_obj_set_style_local_text_color(batteryPlug, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_label_set_text_static(batteryPlug, Symbols::plug);
   lv_obj_align(batteryPlug, batteryIcon.GetObject(), LV_ALIGN_OUT_LEFT_MID, -5, 0);
 
   bleIcon = lv_label_create(lv_scr_act(), nullptr);
-  lv_obj_set_style_local_text_color(bleIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_label_set_text_static(bleIcon, Symbols::bluetooth);
   lv_obj_align(bleIcon, batteryPlug, LV_ALIGN_OUT_LEFT_MID, -5, 0);
 
   alarmIcon = lv_label_create(lv_scr_act(), nullptr);
-  lv_obj_set_style_local_text_color(alarmIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_label_set_text_static(alarmIcon, Symbols::bell);
   lv_obj_align(alarmIcon, bleIcon, LV_ALIGN_OUT_LEFT_MID, -5, 0);
   lv_obj_set_hidden(alarmIcon, !alarmController.IsEnabled());
 
   notificationIcon = lv_label_create(lv_scr_act(), nullptr);
-  lv_obj_set_style_local_text_color(notificationIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_label_set_text_static(notificationIcon, NotificationIcon::GetIcon(false));
   lv_obj_align(notificationIcon, alarmIcon, LV_ALIGN_OUT_LEFT_MID, -5, 0);
 
   label_date = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_align(label_date, lv_scr_act(), LV_ALIGN_IN_TOP_LEFT, 5, 22);
-  lv_obj_set_style_local_text_color(label_date, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_font(label_date, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, font_dot40);
   lv_label_set_text_static(label_date, "6-30");
 
   label_day_of_week = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_align(label_day_of_week, lv_scr_act(), LV_ALIGN_IN_TOP_LEFT, 10, 64);
-  lv_obj_set_style_local_text_color(label_day_of_week, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_font(label_day_of_week, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, font_dot40);
   lv_label_set_text_static(label_day_of_week, "SUN");
 
   label_temperature_unit = lv_label_create(lv_scr_act(), nullptr);
-  lv_obj_set_style_local_text_color(label_temperature_unit, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_font(label_temperature_unit, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, font_dot40);
   lv_label_set_text_static(label_temperature_unit, "");
 
   label_temperature = lv_label_create(lv_scr_act(), nullptr);
-  lv_obj_set_style_local_text_color(label_temperature, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_font(label_temperature, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, font_dot40);
   lv_label_set_text_static(label_temperature, "--");
 
   label_weather_icon = lv_label_create(lv_scr_act(), nullptr);
-  lv_obj_set_style_local_text_color(label_weather_icon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_font(label_weather_icon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &fontawesome_weathericons);
   lv_label_set_text_static(label_weather_icon, "");
 
   label_temperature_low = lv_label_create(lv_scr_act(), nullptr);
-  lv_obj_set_style_local_text_color(label_temperature_low, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_font(label_temperature_low, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &jetbrains_mono_bold_20);
   lv_label_set_text_static(label_temperature_low, "L--");
 
   label_temperature_high = lv_label_create(lv_scr_act(), nullptr);
-  lv_obj_set_style_local_text_color(label_temperature_high, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_font(label_temperature_high, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &jetbrains_mono_bold_20);
   lv_label_set_text_static(label_temperature_high, "H--");
 
@@ -157,12 +161,12 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
 
   lv_style_init(&style_line);
   lv_style_set_line_width(&style_line, LV_STATE_DEFAULT, 2);
-  lv_style_set_line_color(&style_line, LV_STATE_DEFAULT, color_text);
+  lv_style_set_line_color(&style_line, LV_STATE_DEFAULT, ColorLines);
   lv_style_set_line_rounded(&style_line, LV_STATE_DEFAULT, true);
 
   lv_style_init(&style_border);
   lv_style_set_line_width(&style_border, LV_STATE_DEFAULT, 6);
-  lv_style_set_line_color(&style_border, LV_STATE_DEFAULT, color_text);
+  lv_style_set_line_color(&style_border, LV_STATE_DEFAULT, ColorLines);
   lv_style_set_line_rounded(&style_border, LV_STATE_DEFAULT, true);
 
   line_icons = lv_line_create(lv_scr_act(), nullptr);
@@ -186,7 +190,6 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
   lv_obj_align(line_date, nullptr, LV_ALIGN_IN_TOP_RIGHT, 0, 100);
 
   label_time = lv_label_create(lv_scr_act(), nullptr);
-  lv_obj_set_style_local_text_color(label_time, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_font(label_time, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, font_segment115);
   lv_obj_align(label_time, lv_scr_act(), LV_ALIGN_CENTER, 0, 40);
 
@@ -204,40 +207,24 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
 
   heartbeatIcon = lv_label_create(lv_scr_act(), nullptr);
   lv_label_set_text_static(heartbeatIcon, Symbols::heartBeat);
-  lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_align(heartbeatIcon, lv_scr_act(), LV_ALIGN_IN_BOTTOM_LEFT, 5, -2);
 
   heartbeatValue = lv_label_create(lv_scr_act(), nullptr);
-  lv_obj_set_style_local_text_color(heartbeatValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_label_set_text_static(heartbeatValue, "");
   lv_obj_align(heartbeatValue, heartbeatIcon, LV_ALIGN_OUT_RIGHT_MID, 5, 0);
 
   stepValue = lv_label_create(lv_scr_act(), nullptr);
-  lv_obj_set_style_local_text_color(stepValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_label_set_text_static(stepValue, "0");
   lv_obj_align(stepValue, lv_scr_act(), LV_ALIGN_IN_BOTTOM_RIGHT, -5, -2);
 
   stepIcon = lv_label_create(lv_scr_act(), nullptr);
-  lv_obj_set_style_local_text_color(stepIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_label_set_text_static(stepIcon, Symbols::shoe);
   lv_obj_align(stepIcon, stepValue, LV_ALIGN_OUT_LEFT_MID, -5, 0);
-
-  btnSetColor = lv_btn_create(lv_scr_act(), nullptr);
-  btnSetColor->user_data = this;
-  lv_obj_set_size(btnSetColor, 150, 60);
-  lv_obj_align(btnSetColor, lv_scr_act(), LV_ALIGN_CENTER, 0, -40);
-  lv_obj_set_style_local_radius(btnSetColor, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, 20);
-  lv_obj_set_style_local_bg_opa(btnSetColor, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_OPA_50);
-  lv_obj_set_event_cb(btnSetColor, event_handler);
-  lv_obj_t* lblSetColor = lv_label_create(btnSetColor, nullptr);
-  lv_obj_set_style_local_text_font(lblSetColor, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &lv_font_sys_48);
-  lv_label_set_text_static(lblSetColor, Symbols::paintbrushLg);
-  lv_obj_set_hidden(btnSetColor, true);
 
   btnBrightness = lv_btn_create(lv_scr_act(), nullptr);
   btnBrightness->user_data = this;
   lv_obj_set_size(btnBrightness, 150, 60);
-  lv_obj_align(btnBrightness, lv_scr_act(), LV_ALIGN_CENTER, 0, 40);
+  lv_obj_align(btnBrightness, lv_scr_act(), LV_ALIGN_CENTER, 0, 0);
   lv_obj_set_style_local_radius(btnBrightness, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, 20);
   lv_obj_set_style_local_bg_opa(btnBrightness, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_OPA_50);
   lv_obj_set_event_cb(btnBrightness, event_handler);
@@ -246,6 +233,7 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
   lv_label_set_text_static(lblBrightness, brightnessController.GetIcon());
   lv_obj_set_hidden(btnBrightness, true);
 
+  ApplyTheme();
   taskRefresh = lv_task_create(RefreshTaskCallback, LV_DISP_DEF_REFR_PERIOD, LV_TASK_PRIO_MID, this);
   Refresh();
 }
@@ -268,32 +256,43 @@ WatchFaceCasioStyleG7710::~WatchFaceCasioStyleG7710() {
   lv_obj_clean(lv_scr_act());
 }
 
-void WatchFaceCasioStyleG7710::ApplyColor(lv_color_t color) {
-  color_text = color;
+void WatchFaceCasioStyleG7710::ApplyTheme() {
+  // Battery % / icon stay on the charge-level HSV curve (not theme chrome).
+  const auto batteryPercent = batteryController.PercentRemaining();
+  batteryIcon.SetBatteryPercentage(batteryPercent);
+  lv_obj_set_style_local_text_color(label_battery_value,
+                                    LV_LABEL_PART_MAIN,
+                                    LV_STATE_DEFAULT,
+                                    BatteryIcon::ColorFromPercentage(batteryPercent));
 
-  lv_obj_set_style_local_text_color(label_battery_value, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  batteryIcon.SetColor(color_text);
-  lv_obj_set_style_local_text_color(batteryPlug, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_color(bleIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_color(alarmIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_color(notificationIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_color(label_date, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_color(label_day_of_week, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_color(label_temperature_unit, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_color(label_temperature, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_color(label_weather_icon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_color(label_temperature_low, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_color(label_temperature_high, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_color(label_time, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_color(stepValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_color(stepIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_color(heartbeatValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_obj_set_style_local_text_color(batteryPlug, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorChrome);
+  lv_obj_set_style_local_text_color(bleIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorChrome);
+  lv_obj_set_style_local_text_color(alarmIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorChrome);
+  lv_obj_set_style_local_text_color(notificationIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorChrome);
+
+  lv_obj_set_style_local_text_color(label_date, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorDate);
+  lv_obj_set_style_local_text_color(label_day_of_week, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorDate);
+
+  lv_obj_set_style_local_text_color(label_temperature_unit, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorWeather);
+  lv_obj_set_style_local_text_color(label_temperature, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorWeather);
+  lv_obj_set_style_local_text_color(label_weather_icon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorWeather);
+  lv_obj_set_style_local_text_color(label_temperature_low, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorWeather);
+  lv_obj_set_style_local_text_color(label_temperature_high, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorWeather);
+
+  lv_obj_set_style_local_text_color(label_time, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorTime);
+
+  lv_obj_set_style_local_text_color(stepValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorSteps);
+  lv_obj_set_style_local_text_color(stepIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorSteps);
+
+  lv_obj_set_style_local_text_color(heartbeatValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorHeart);
   if (heartbeatRunning.Get()) {
-    lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+    lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorHeart);
+  } else {
+    lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorHeartIdle);
   }
 
-  lv_style_set_line_color(&style_line, LV_STATE_DEFAULT, color_text);
-  lv_style_set_line_color(&style_border, LV_STATE_DEFAULT, color_text);
+  lv_style_set_line_color(&style_line, LV_STATE_DEFAULT, ColorLines);
+  lv_style_set_line_color(&style_border, LV_STATE_DEFAULT, ColorLines);
   lv_obj_add_style(line_icons, LV_LINE_PART_MAIN, &style_line);
   lv_obj_add_style(line_day_of_week_number, LV_LINE_PART_MAIN, &style_border);
   lv_obj_add_style(line_temperature, LV_LINE_PART_MAIN, &style_line);
@@ -301,21 +300,12 @@ void WatchFaceCasioStyleG7710::ApplyColor(lv_color_t color) {
   lv_obj_add_style(line_time, LV_LINE_PART_MAIN, &style_line);
 }
 
-Pinetime::Controllers::Settings::Colors WatchFaceCasioStyleG7710::GetNextColor(Pinetime::Controllers::Settings::Colors color) {
-  auto colorAsInt = static_cast<uint8_t>(color);
-  if (colorAsInt < 17) {
-    return static_cast<Controllers::Settings::Colors>(colorAsInt + 1);
-  }
-  return static_cast<Controllers::Settings::Colors>(0);
-}
-
 bool WatchFaceCasioStyleG7710::IsOverlayVisible() const {
-  return !lv_obj_get_hidden(btnSetColor);
+  return !lv_obj_get_hidden(btnBrightness);
 }
 
 void WatchFaceCasioStyleG7710::CloseOverlay() {
   settingsController.SaveSettings();
-  lv_obj_set_hidden(btnSetColor, true);
   lv_obj_set_hidden(btnBrightness, true);
   colorMenuTick = 0;
 }
@@ -323,7 +313,6 @@ void WatchFaceCasioStyleG7710::CloseOverlay() {
 bool WatchFaceCasioStyleG7710::OnTouchEvent(Pinetime::Applications::TouchEvents event) {
   if (event == Pinetime::Applications::TouchEvents::LongTap && !IsOverlayVisible()) {
     lv_label_set_text_static(lblBrightness, brightnessController.GetIcon());
-    lv_obj_set_hidden(btnSetColor, false);
     lv_obj_set_hidden(btnBrightness, false);
     colorMenuTick = xTaskGetTickCount();
     return true;
@@ -346,12 +335,7 @@ void WatchFaceCasioStyleG7710::OnOverlayButtonEvent(lv_obj_t* object, lv_event_t
   if (event != LV_EVENT_CLICKED) {
     return;
   }
-  if (object == btnSetColor) {
-    auto next = GetNextColor(settingsController.GetCasioColor());
-    settingsController.SetCasioColor(next);
-    ApplyColor(Convert(next));
-    colorMenuTick = xTaskGetTickCount();
-  } else if (object == btnBrightness) {
+  if (object == btnBrightness) {
     brightnessController.Step();
     lv_label_set_text_static(lblBrightness, brightnessController.GetIcon());
     settingsController.SetBrightness(brightnessController.Level());
@@ -377,6 +361,10 @@ void WatchFaceCasioStyleG7710::Refresh() {
   if (batteryPercentRemaining.IsUpdated()) {
     auto batteryPercent = batteryPercentRemaining.Get();
     batteryIcon.SetBatteryPercentage(batteryPercent);
+    lv_obj_set_style_local_text_color(label_battery_value,
+                                      LV_LABEL_PART_MAIN,
+                                      LV_STATE_DEFAULT,
+                                      BatteryIcon::ColorFromPercentage(batteryPercent));
     lv_label_set_text_fmt(label_battery_value, "%d%%", batteryPercent);
     statusBarDirty = true;
   }
@@ -477,15 +465,15 @@ void WatchFaceCasioStyleG7710::Refresh() {
   heartbeatRunning = heartRateController.State() != Controllers::HeartRateController::States::Disabled;
   if (heartbeat.IsUpdated() || heartbeatRunning.IsUpdated()) {
     if (heartbeatRunning.Get()) {
-      lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-      // PPGv2: only show a trusted Ready sample — never a bogus 0 while searching.
-      if (heartRateController.State() == Controllers::HeartRateController::States::Ready && heartbeat.Get() > 0) {
+      lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorHeart);
+      // Hold last known BPM between samples; stay blank until the first trusted reading.
+      if (heartbeat.Get() > 0) {
         lv_label_set_text_fmt(heartbeatValue, "%d", heartbeat.Get());
       } else {
         lv_label_set_text_static(heartbeatValue, "");
       }
     } else {
-      lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, lv_color_hex(0x1B1B1B));
+      lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorHeartIdle);
       lv_label_set_text_static(heartbeatValue, "");
     }
 

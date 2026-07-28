@@ -1,24 +1,37 @@
 # InfiniSim patches (personal)
 
-Apply these onto a local InfiniSim tree that points at [InfiniTime---Personal](https://github.com/lecrackzor/InfiniTime---Personal):
+Apply onto a local InfiniSim tree that points at [InfiniTime---Personal](https://github.com/lecrackzor/InfiniTime---Personal):
 
 ```bash
-INFINSIM=/home/dethbox/Projects/InfiniSim
+# WSL / Linux — one shot
+python3 tools/infinisim-patches/apply-personal-sim.py
+# expects InfiniSim at ~/Projects/InfiniSim and InfiniTime at ~/Projects/InfiniTime
+# (symlink InfiniSim/InfiniTime -> personal tree)
+```
+
+Or copy files manually:
+
+```bash
+INFINSIM=$HOME/Projects/InfiniSim
 cp tools/infinisim-patches/queue.cpp               "$INFINSIM/sim/queue.cpp"
 cp tools/infinisim-patches/queue.h                 "$INFINSIM/sim/queue.h"
 cp tools/infinisim-patches/semphr.cpp              "$INFINSIM/sim/semphr.cpp"
 cp tools/infinisim-patches/semphr.h                "$INFINSIM/sim/semphr.h"
 cp tools/infinisim-patches/HeartRateTask.h         "$INFINSIM/sim/heartratetask/HeartRateTask.h"
+cp tools/infinisim-patches/HeartRateTask.cpp       "$INFINSIM/sim/heartratetask/HeartRateTask.cpp"
 cp tools/infinisim-patches/HeartRateController.h   "$INFINSIM/sim/components/heartrate/HeartRateController.h"
 cp tools/infinisim-patches/HeartRateController.cpp "$INFINSIM/sim/components/heartrate/HeartRateController.cpp"
 ```
 
+`apply-personal-sim.py` also sets InfiniSim `CMakeLists.txt` / `main.cpp` for personal settings:
+- `MONITOR_ZOOM=2`, `INFINITIME_SIMULATOR=1`
+- exclude trimmed Paint/Paddle/Twos/Dice/Metronome + Analog/Infineat/PTS/PrideFlag screens
+- PPGv2 `HeartRateTask` ctor, face keys `1` Digital / `2` Terminal / `3` Casio, boot `DisableSleeping`
+
 Also required in InfiniSim (not always copied as files — keep in your InfiniSim working tree):
-- `main.cpp`: PPGv2 `HeartRateTask` ctor, `NoInit_Persistence`, no “Screen is OFF” overlay, boot `DisableSleeping`, `--casio-preview` injects weather, `--scroll-smoke` exercises Settings Up/Down
 - `sim/displayapp/LittleVgl.cpp`: `MoveScreen` scrolls `monitor.tft_fb` with `memmove` only (no SDL from DisplayApp)
 - `sim/nrfx/hal/nrf_gpio.cpp`: latched button GPIO (`nrf_gpio_sim_set_button`)
 - `sim/task.cpp`: `vTaskDelay` converts ticks → ms
-- `CMakeLists.txt`: `INFINITIME_SIMULATOR=1`, `MONITOR_ZOOM=2`; exclude trimmed Paint/Paddle/Twos/Dice/Metronome + Analog/Infineat/PTS/PrideFlag screens from the InfiniTime screens glob
 - `lv_drivers/display/monitor.c`: present only via main-thread `monitor_sdl_ui_update()`
 
 ## What changed
@@ -31,43 +44,23 @@ Also required in InfiniSim (not always copied as files — keep in your InfiniSi
 ## Known-good run
 
 ```bash
-# once: deps
-sudo pacman -S cmake ninja nodejs npm sdl2 libpng xorg-server-xvfb
+# build
+export MAMBA_ROOT_PREFIX=$HOME/nrf52/tools/micromamba/root
+ENV=$MAMBA_ROOT_PREFIX/envs/infinisim
+export PATH="$ENV/bin:$HOME/nrf52/tools/cmake/bin:$PATH"
+export CC=$ENV/bin/x86_64-conda-linux-gnu-gcc
+export CXX=$ENV/bin/x86_64-conda-linux-gnu-g++
+cd ~/Projects/InfiniSim
+cmake -S . -B build -DMONITOR_ZOOM=2 -DInfiniTime_DIR=$HOME/Projects/InfiniTime
+cmake --build build -j$(nproc) --target infinisim
 
-# build (from InfiniSim, pointing at personal InfiniTime)
-cmake -G Ninja -S /home/dethbox/Projects/InfiniSim -B /home/dethbox/Projects/build_lv_sim \
-  -DInfiniTime_DIR=/home/dethbox/Projects/InfiniTime---Personal \
-  -DBUILD_RESOURCES=ON -DMONITOR_ZOOM=2
-cmake --build /home/dethbox/Projects/build_lv_sim --target infinisim littlefs-do
-cd /home/dethbox/Projects/build_lv_sim
-./littlefs-do res load resources/infinitime-resources-*.zip
-
-# run (kills stale sim first)
-chmod +x /home/dethbox/Projects/InfiniTime---Personal/tools/infinisim-patches/run-infinisim.sh
-/home/dethbox/Projects/InfiniTime---Personal/tools/infinisim-patches/run-infinisim.sh
+# run
+~/Projects/run-infinisim.sh
+# or: tools/infinisim-patches/run-infinisim.sh
 ```
 
-Keys: `3` Casio Custom, `1` Digital, `i` screenshot, `w` inject weather, right-click = side button.
+Keys: `3` Casio Custom, `1` Digital, `2` Terminal, `i` screenshot, `w` inject weather, right-click = side button.
 
-**README / doc screenshots:** Casio Custom is weather-first. Always press `w` (or use `--casio-preview`, which injects weather) before capturing; otherwise the PNG looks mostly empty on the right.
-
-If the window is a **black box**:
-- Rebuild InfiniSim with the main-thread `monitor_sdl_ui_update()` present fix and use `run-infinisim.sh`.
-- If it dies when opening/scrolling **Settings** (or Launcher/Notifications Up/Down), rebuild with the `MoveScreen` `tft_fb` memmove fix (off-thread SDL was the cause).
-
-One-shot Casio PNG (with weather):
-
-```bash
-cd /home/dethbox/Projects/build_lv_sim
-SDL_VIDEODRIVER=x11 ./infinisim --casio-preview /tmp/casio.png
-```
-
-Settings scroll smoke (writes PNGs; should stay non-black):
-
-```bash
-cd /home/dethbox/Projects/build_lv_sim
-mkdir -p /tmp/scroll-smoke
-SDL_VIDEODRIVER=x11 ./infinisim --scroll-smoke /tmp/scroll-smoke
-```
+**README / doc screenshots:** Casio Custom is weather-first. Always press `w` before capturing; otherwise the PNG looks mostly empty on the right.
 
 Preferred long-term: personal InfiniSim fork so patches are not re-copied.

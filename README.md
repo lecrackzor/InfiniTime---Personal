@@ -18,7 +18,9 @@ Personal [InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime) fork for the 
 - Renamed from **Casio Style G7710** to **Casio Custom**
 - Weather-focused layout: date and day on the left; icon, temperature, and daily low/high on the right (replaces week number / day-of-year)
 - Empty weather shows `--` / `L--` `H--` until Gadgetbridge syncs
-- Long-press overlay: cycle face color (paintbrush) and step display brightness
+- **Warm Cockpit** theme (fixed role colors): amber time, orange date/day, soft-cyan weather, red HR, lime steps, dim-amber lines/status chrome
+- Battery % and icon keep the independent Terminal HSV charge curve (green→yellow→red; not themed)
+- Long-press overlay: brightness only (paintbrush single-color cycle removed for this themed face)
 - Top status bar shows a bell when the alarm is enabled
 - Status icons realign only when battery / BLE / alarm / notification state changes
 - Flash font load falls back to built-in JetBrains if `lv_font_load` fails
@@ -75,6 +77,7 @@ App polish:
 - Stopwatch: rebuild lap list in one buffer instead of repeated `lv_label_ins_text` (reduces LVGL churn under mash)
 - Docker: ensure `build.sh` is executable in the image ([upstream #2367](https://github.com/InfiniTimeOrg/InfiniTime/pull/2367))
 - Battery icon: low-battery color no longer overwrites the configured base color ([upstream #2208](https://github.com/InfiniTimeOrg/InfiniTime/pull/2208))
+- Battery icon / Digital status: continuous green→yellow→red tint from charge % (Terminal curve; same idea as upstream [#1964](https://github.com/InfiniTimeOrg/InfiniTime/pull/1964))
 - Music: show waiting placeholders until real track metadata arrives ([upstream #1841](https://github.com/InfiniTimeOrg/InfiniTime/pull/1841))
 - SPI: chunk `WriteCmdAndBuffer` payloads the same way as reads/writes
 - Stopwatch: lap labels wrap in 1..999 (0 is empty-slot sentinel, so `% 1000` made laps vanish)

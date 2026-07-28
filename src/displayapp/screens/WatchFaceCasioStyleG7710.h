@@ -53,10 +53,9 @@ namespace Pinetime {
         static bool IsAvailable(Pinetime::Controllers::FS& filesystem);
 
       private:
-        void ApplyColor(lv_color_t color);
+        void ApplyTheme();
         void CloseOverlay();
         bool IsOverlayVisible() const;
-        static Controllers::Settings::Colors GetNextColor(Controllers::Settings::Colors color);
 
         Utility::DirtyValue<uint8_t> batteryPercentRemaining {};
         Utility::DirtyValue<bool> powerPresent {};
@@ -76,8 +75,6 @@ namespace Pinetime {
         lv_point_t line_day_of_year_points[3] {{0, 5}, {130, 5}, {135, 0}};
         lv_point_t line_date_points[3] {{0, 5}, {135, 5}, {140, 0}};
         lv_point_t line_time_points[3] {{0, 0}, {230, 0}, {235, 5}};
-
-        lv_color_t color_text;
 
         lv_style_t style_line;
         lv_style_t style_border;
@@ -105,7 +102,6 @@ namespace Pinetime {
         lv_obj_t* stepValue;
         lv_obj_t* notificationIcon;
         lv_obj_t* line_icons;
-        lv_obj_t* btnSetColor;
         lv_obj_t* btnBrightness;
         lv_obj_t* lblBrightness;
 

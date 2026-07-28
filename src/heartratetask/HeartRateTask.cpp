@@ -284,7 +284,12 @@ void HeartRateTask::HandleSensorData() {
     if (bpm.has_value()) {
       SendHeartRate(ControllerStates::Ready, bpm.value());
     } else if (ppg.SufficientData()) {
-      SendHeartRate(ControllerStates::Searching, 0);
+      // Keep last known BPM while re-acquiring — only clear when nothing was shown yet.
+      if (valueCurrentlyShown) {
+        controller.UpdateState(ControllerStates::Searching);
+      } else {
+        SendHeartRate(ControllerStates::Searching, 0);
+      }
     } else {
       // If there's currently a value shown, don't clear it
       // But still update the algorithm state

@@ -3,7 +3,6 @@
 #include "displayapp/screens/BatteryIcon.h"
 #include "displayapp/screens/Symbols.h"
 #include "displayapp/icons/battery/batteryicon.c"
-#include "displayapp/InfiniTimeTheme.h"
 #include <lvgl/src/lv_misc/lv_color.h>
 
 using namespace Pinetime::Applications::Screens;
@@ -29,15 +28,8 @@ void BatteryIcon::SetBatteryPercentage(uint8_t percentage) {
   lv_obj_set_height(batteryJuice, percentage * 14 / 100);
   lv_obj_realign(batteryJuice);
   if (colorOnLowBattery) {
-    static constexpr int lowBatteryThreshold = 15;
-    static constexpr int criticalBatteryThreshold = 5;
-    if (percentage > lowBatteryThreshold) {
-      ApplyColor(baseColor);
-    } else if (percentage > criticalBatteryThreshold) {
-      ApplyColor(LV_COLOR_ORANGE);
-    } else {
-      ApplyColor(Colors::deepOrange);
-    }
+    // Same green→yellow→red HSV curve as Terminal / upstream #1964
+    ApplyColor(ColorFromPercentage(percentage));
   }
 }
 
