@@ -23,6 +23,8 @@ Personal [InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime) fork for the 
 
 ![Casio Custom two-font InfiniSim preview](doc/personal/casio-custom-two-font.png)
 
+InfiniSim README screenshots of this face must inject weather (`w` in the sim, or `--casio-preview` which does it automatically); without weather the right side looks empty.
+
 ### Apps
 Removed from the default app list:
 - Paint

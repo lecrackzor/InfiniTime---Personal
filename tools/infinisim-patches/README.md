@@ -44,16 +44,17 @@ chmod +x /home/dethbox/Projects/InfiniTime---Personal/tools/infinisim-patches/ru
 /home/dethbox/Projects/InfiniTime---Personal/tools/infinisim-patches/run-infinisim.sh
 ```
 
-Keys: `3` Casio Custom, `1` Digital, `i` screenshot, right-click = side button.
+Keys: `3` Casio Custom, `1` Digital, `i` screenshot, `w` inject weather, right-click = side button.
 
-If the window is a **black box**: you are on an old binary, or SDL present was off-thread.
-Rebuild InfiniSim (monitor.c present-from-main fix) and use `run-infinisim.sh` above.
+**README / doc screenshots:** Casio Custom is weather-first. Always press `w` (or use `--casio-preview`, which injects weather) before capturing; otherwise the PNG looks mostly empty on the right.
 
-One-shot Casio PNG (no interaction):
+If the window is a **black box**: rebuild InfiniSim with the main-thread `monitor_sdl_ui_update()` present fix and use `run-infinisim.sh`.
+
+One-shot Casio PNG (with weather):
 
 ```bash
 cd /home/dethbox/Projects/build_lv_sim
-./infinisim --casio-preview /tmp/casio.png
+SDL_VIDEODRIVER=x11 ./infinisim --casio-preview /tmp/casio.png
 ```
 
 Preferred long-term: personal InfiniSim fork so patches are not re-copied.
