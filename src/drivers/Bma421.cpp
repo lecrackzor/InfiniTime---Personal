@@ -26,11 +26,12 @@ namespace {
   // Scale factors to convert accelerometer counts to milli-g
   // from datasheet: https://files.pine64.org/doc/datasheet/pinetime/BST-BMA421-FL000.pdf
   // The array index to use is stored in accel_conf.range
+  // Indexed by BMA4_ACCEL_RANGE_{2,4,8,16}G (0..3). Values are LSB/g.
   constexpr int16_t accelScaleFactors[] = {
-    [BMA4_ACCEL_RANGE_8G] = 1024, // LSB/g +/- 2g range
-    [BMA4_ACCEL_RANGE_4G] = 512,  // LSB/g +/- 4g range
-    [BMA4_ACCEL_RANGE_8G] = 256,  // LSB/g +/- 8g range
-    [BMA4_ACCEL_RANGE_16G] = 128  // LSB/g +/- 16g range
+    1024, // +/- 2g
+    512,  // +/- 4g
+    256,  // +/- 8g
+    128,  // +/- 16g
   };
 }
 
