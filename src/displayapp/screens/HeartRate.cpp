@@ -17,7 +17,7 @@ namespace {
       case Pinetime::Controllers::HeartRateController::States::NoTouch:
         return "No touch detected";
       case Pinetime::Controllers::HeartRateController::States::Ready:
-        return "Measuring...";
+        return "Ready";
       case Pinetime::Controllers::HeartRateController::States::Stopped:
         return "Stopped";
       case Pinetime::Controllers::HeartRateController::States::Disabled:
@@ -54,9 +54,13 @@ HeartRate::HeartRate(Controllers::HeartRateController& heartRateController, Syst
 
   label_status = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_set_style_local_text_color(label_status, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, LV_COLOR_GRAY);
-  lv_label_set_text_static(label_status, ToString(Pinetime::Controllers::HeartRateController::States::Disabled));
+  lv_label_set_text_static(label_status, ToString(heartRateController.State()));
 
   lv_obj_align(label_status, label_hr, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+
+  if (heartRateController.HeartRate() > 0) {
+    lv_label_set_text_fmt(label_hr, "%03d", heartRateController.HeartRate());
+  }
 
   btn_startStop = lv_btn_create(lv_scr_act(), nullptr);
   btn_startStop->user_data = this;
@@ -79,16 +83,21 @@ HeartRate::~HeartRate() {
 }
 
 void HeartRate::Refresh() {
+  heartRate = heartRateController.HeartRate();
+  state = heartRateController.State();
 
-  auto state = heartRateController.State();
-  if (heartRateController.HeartRate() == 0) {
-    lv_label_set_text_static(label_hr, "---");
-  } else {
-    lv_label_set_text_fmt(label_hr, "%03d", heartRateController.HeartRate());
+  if (heartRate.IsUpdated()) {
+    if (heartRate.Get() == 0) {
+      lv_label_set_text_static(label_hr, "---");
+    } else {
+      lv_label_set_text_fmt(label_hr, "%03d", heartRate.Get());
+    }
   }
 
-  lv_label_set_text_static(label_status, ToString(state));
-  lv_obj_align(label_status, label_hr, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+  if (state.IsUpdated()) {
+    lv_label_set_text_static(label_status, ToString(state.Get()));
+    lv_obj_align(label_status, label_hr, LV_ALIGN_OUT_BOTTOM_MID, 0, 10);
+  }
 }
 
 void HeartRate::OnStartStopEvent(lv_event_t event) {

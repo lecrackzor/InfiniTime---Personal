@@ -208,6 +208,7 @@ void Alarm::SetAlerting() {
     wakeLock.Lock();
     return;
   }
+  HideInfo();
   lv_obj_set_hidden(enableSwitch, true);
   lv_obj_set_hidden(btnRecur, true);
   lv_obj_set_hidden(btnInfo, true);
@@ -260,18 +261,30 @@ void Alarm::ShowInfo() {
     auto minToAlarm = (timeToAlarm % 3600) / 60;
     auto secToAlarm = timeToAlarm % 60;
 
-    lv_label_set_text_fmt(txtMessage,
-                          "Time to\nalarm:\n%2lu Days\n%2lu Hours\n%2lu Minutes\n%2lu Seconds",
-                          daysToAlarm,
-                          hrsToAlarm,
-                          minToAlarm,
-                          secToAlarm);
+    // Omit zero leading units so "0 Days" / "0 Hours" don't dominate short alarms.
+    if (daysToAlarm > 0) {
+      lv_label_set_text_fmt(txtMessage,
+                            "Time to\nalarm:\n%lu Days\n%lu Hours\n%lu Minutes\n%lu Seconds",
+                            daysToAlarm,
+                            hrsToAlarm,
+                            minToAlarm,
+                            secToAlarm);
+    } else if (hrsToAlarm > 0) {
+      lv_label_set_text_fmt(txtMessage, "Time to\nalarm:\n%lu Hours\n%lu Minutes\n%lu Seconds", hrsToAlarm, minToAlarm, secToAlarm);
+    } else if (minToAlarm > 0) {
+      lv_label_set_text_fmt(txtMessage, "Time to\nalarm:\n%lu Minutes\n%lu Seconds", minToAlarm, secToAlarm);
+    } else {
+      lv_label_set_text_fmt(txtMessage, "Time to\nalarm:\n%lu Seconds", secToAlarm);
+    }
   } else {
     lv_label_set_text_static(txtMessage, "Alarm\nis not\nset.");
   }
 }
 
 void Alarm::HideInfo() {
+  if (btnMessage == nullptr) {
+    return;
+  }
   lv_obj_del(btnMessage);
   txtMessage = nullptr;
   btnMessage = nullptr;

@@ -89,8 +89,6 @@ StopWatch::StopWatch(System::SystemTask& systemTask, StopWatchController& stopWa
     RenderTime();
 
     if (stopWatchController.IsRunning()) {
-      lv_obj_set_state(btnStopLap, LV_STATE_DISABLED);
-      lv_obj_set_state(txtStopLap, LV_STATE_DISABLED);
       DisplayStarted();
       wakeLock.Lock();
     } else if (stopWatchController.IsPaused()) {
@@ -154,7 +152,10 @@ void StopWatch::RenderTime() {
       lv_label_set_text_fmt(time, "%02d:%02d:%02d", elapsedTime.hours, elapsedTime.mins, elapsedTime.secs);
     }
   }
-  lv_label_set_text_fmt(msecTime, "%02d", elapsedTime.hundredths);
+  renderedHundredths = elapsedTime.hundredths;
+  if (renderedHundredths.IsUpdated()) {
+    lv_label_set_text_fmt(msecTime, "%02d", renderedHundredths.Get());
+  }
 }
 
 void StopWatch::RenderPause() {

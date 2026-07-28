@@ -50,6 +50,7 @@ namespace Pinetime::Applications {
       lv_obj_t *time, *msecTime, *btnPlayPause, *btnStopLap, *txtPlayPause, *txtStopLap;
       lv_obj_t* lapText;
       Utility::DirtyValue<uint32_t> renderedSeconds;
+      Utility::DirtyValue<uint8_t> renderedHundredths;
       bool hoursVisible = false;
 
       lv_task_t* taskRefresh;

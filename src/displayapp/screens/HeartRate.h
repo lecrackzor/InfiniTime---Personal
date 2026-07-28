@@ -4,14 +4,12 @@
 #include "systemtask/SystemTask.h"
 #include "systemtask/WakeLock.h"
 #include "Symbols.h"
+#include "utility/DirtyValue.h"
+#include "components/heartrate/HeartRateController.h"
 #include <lvgl/src/lv_core/lv_obj.h>
 #include <lvgl/src/lv_core/lv_style.h>
 
 namespace Pinetime {
-  namespace Controllers {
-    class HeartRateController;
-  }
-
   namespace Applications {
     namespace Screens {
 
@@ -33,6 +31,9 @@ namespace Pinetime {
         lv_obj_t* label_status;
         lv_obj_t* btn_startStop;
         lv_obj_t* label_startStop;
+
+        Utility::DirtyValue<uint8_t> heartRate {};
+        Utility::DirtyValue<Controllers::HeartRateController::States> state {};
 
         lv_task_t* taskRefresh;
       };

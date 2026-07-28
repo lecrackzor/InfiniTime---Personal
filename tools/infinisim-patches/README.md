@@ -18,7 +18,7 @@ Also required in InfiniSim (not always copied as files — keep in your InfiniSi
 - `sim/displayapp/LittleVgl.cpp`: `MoveScreen` scrolls `monitor.tft_fb` with `memmove` only (no SDL from DisplayApp)
 - `sim/nrfx/hal/nrf_gpio.cpp`: latched button GPIO (`nrf_gpio_sim_set_button`)
 - `sim/task.cpp`: `vTaskDelay` converts ticks → ms
-- `CMakeLists.txt`: `INFINITIME_SIMULATOR=1`, `MONITOR_ZOOM=2`
+- `CMakeLists.txt`: `INFINITIME_SIMULATOR=1`, `MONITOR_ZOOM=2`; exclude trimmed Paint/Paddle/Twos/Dice/Metronome + Analog/Infineat/PTS/PrideFlag screens from the InfiniTime screens glob
 - `lv_drivers/display/monitor.c`: present only via main-thread `monitor_sdl_ui_update()`
 
 ## What changed

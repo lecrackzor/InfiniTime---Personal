@@ -84,7 +84,6 @@ namespace Pinetime {
 
         lv_obj_t* label_time;
         lv_obj_t* line_time;
-        lv_obj_t* label_time_ampm;
         lv_obj_t* label_date;
         lv_obj_t* line_date;
         lv_obj_t* label_day_of_week;
@@ -126,6 +125,8 @@ namespace Pinetime {
         lv_task_t* taskRefresh;
         lv_font_t* font_dot40 = nullptr;
         lv_font_t* font_segment115 = nullptr;
+        bool font_dot40_loaded = false;
+        bool font_segment115_loaded = false;
         TickType_t colorMenuTick = 0;
       };
     }

@@ -53,11 +53,9 @@ namespace Pinetime {
         lv_obj_t* btnMessage = nullptr;
         lv_task_t* taskStopAlarm = nullptr;
 
-        enum class EnableButtonState { On, Off, Alerting };
         void DisableAlarm();
         void SetRecurButtonState();
         void SetSwitchState(lv_anim_enable_t anim);
-        void SetAlarm();
         void ShowInfo();
         void HideInfo();
         void ToggleRecurrence();

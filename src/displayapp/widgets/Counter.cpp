@@ -57,6 +57,9 @@ void Counter::DownBtnPressed() {
 };
 
 void Counter::SetValue(int newValue) {
+  if (value == newValue) {
+    return;
+  }
   value = newValue;
   UpdateLabel();
 }

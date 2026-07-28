@@ -17,16 +17,24 @@ Personal [InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime) fork for the 
 ### Casio Custom watchface
 - Renamed from **Casio Style G7710** to **Casio Custom**
 - Weather-focused layout: date and day on the left; icon, temperature, and daily low/high on the right (replaces week number / day-of-year)
+- Empty weather shows `--` / `L--` `H--` until Gadgetbridge syncs
 - Long-press overlay: cycle face color (paintbrush) and step display brightness
 - Top status bar shows a bell when the alarm is enabled
+- Status icons realign only when battery / BLE / alarm / notification state changes
+- Flash font load falls back to built-in JetBrains if `lv_font_load` fails
+- No AM/PM letter on the face (12h still shows 1–12 digits only)
 - **Two flash fonts** (PPGv2 RAM headroom): `7segments_115` for the big time + `lv_font_dots_40` for date/day/temp; dropped `7segments_40`. L/H still use built-in JetBrains Bold 20
 
 ![Casio Custom two-font InfiniSim preview](doc/personal/casio-custom-two-font.png)
 
-InfiniSim README screenshots of this face must inject weather (`w` in the sim, or `--casio-preview` which does it automatically); without weather the right side looks empty.
+InfiniSim README screenshots of this face must inject weather (`w` in the sim, or `--casio-preview` which does it automatically); without weather the right side shows `--` placeholders.
+
+### Watch faces
+Built into firmware: **Digital**, **Terminal**, **Casio Custom** (default for factory / wiped settings).
+Removed from the default build: Analog, PineTimeStyle, Infineat, Pride Flag (also drops `open_sans_light` from firmware fonts).
 
 ### Apps
-Removed from the default app list:
+Removed from the default app list **and no longer compiled**:
 - Paint
 - Paddle
 - Twos
@@ -35,8 +43,16 @@ Removed from the default app list:
 
 Kept: Stopwatch, Alarm, Timer, Steps, Heart Rate, Music, Navigation, Calculator, Weather
 
+App polish:
+- Heart Rate: DirtyValue-gated BPM/status; status text includes **Ready** (not “Measuring…”)
+- StopWatch: DirtyValue-gated hundredths (less LVGL churn while running)
+- Timer: long-press release no longer flashes **Start** while ringing
+- Alarm: dismisses open info overlay when alerting; tighter “time to alarm” copy
+- Counter widget: skip redraw when value unchanged (helps Timer)
+
 ### Defaults
-- Wake-up: **Double Tap** enabled by default (factory / wiped settings only; existing `settings.h` is unchanged)
+- Watch face: **Casio Custom** (factory / wiped settings only; existing `settings.dat` is unchanged)
+- Wake-up: **Double Tap** enabled by default (factory / wiped settings only; existing `settings.dat` is unchanged)
 
 ### Bug fixes
 - Timer: screen can sleep again after tapping **Reset** during the ring ([upstream #2419](https://github.com/InfiniTimeOrg/InfiniTime/issues/2419))

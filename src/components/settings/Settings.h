@@ -393,7 +393,7 @@ namespace Pinetime {
         WeatherFormat weatherFormat = WeatherFormat::Metric;
         Notification notificationStatus = Notification::On;
 
-        Pinetime::Applications::WatchFace watchFace = Pinetime::Applications::WatchFace::Digital;
+        Pinetime::Applications::WatchFace watchFace = Pinetime::Applications::WatchFace::CasioStyleG7710;
         ChimesOption chimesOption = ChimesOption::None;
 
         PineTimeStyle PTS;

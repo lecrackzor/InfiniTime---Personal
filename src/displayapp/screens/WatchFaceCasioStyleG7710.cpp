@@ -23,6 +23,7 @@
 using namespace Pinetime::Applications::Screens;
 
 extern lv_font_t jetbrains_mono_bold_20;
+extern lv_font_t jetbrains_mono_extrabold_compressed;
 LV_FONT_DECLARE(lv_font_sys_48);
 
 namespace {
@@ -59,15 +60,26 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
 
   // Two flash fonts for PPGv2 RAM headroom: big 7-segment time + Casio dots for
   // date/day/temp. Dropped 7segments_40 (digits-only, ~760B) — dots covers those glyphs.
+  // Fall back to built-in JetBrains if load fails (do not free those pointers).
   lfs_file f = {};
   if (filesystem.FileOpen(&f, "/fonts/lv_font_dots_40.bin", LFS_O_RDONLY) >= 0) {
     filesystem.FileClose(&f);
     font_dot40 = lv_font_load("F:/fonts/lv_font_dots_40.bin");
   }
+  if (font_dot40 == nullptr) {
+    font_dot40 = &jetbrains_mono_bold_20;
+  } else {
+    font_dot40_loaded = true;
+  }
 
   if (filesystem.FileOpen(&f, "/fonts/7segments_115.bin", LFS_O_RDONLY) >= 0) {
     filesystem.FileClose(&f);
     font_segment115 = lv_font_load("F:/fonts/7segments_115.bin");
+  }
+  if (font_segment115 == nullptr) {
+    font_segment115 = &jetbrains_mono_extrabold_compressed;
+  } else {
+    font_segment115_loaded = true;
   }
 
   label_battery_value = lv_label_create(lv_scr_act(), nullptr);
@@ -120,7 +132,7 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
   label_temperature = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_set_style_local_text_color(label_temperature, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_font(label_temperature, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, font_dot40);
-  lv_label_set_text_static(label_temperature, "");
+  lv_label_set_text_static(label_temperature, "--");
 
   label_weather_icon = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_set_style_local_text_color(label_weather_icon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
@@ -130,12 +142,18 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
   label_temperature_low = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_set_style_local_text_color(label_temperature_low, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_font(label_temperature_low, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &jetbrains_mono_bold_20);
-  lv_label_set_text_static(label_temperature_low, "");
+  lv_label_set_text_static(label_temperature_low, "L--");
 
   label_temperature_high = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_set_style_local_text_color(label_temperature_high, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_font(label_temperature_high, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &jetbrains_mono_bold_20);
-  lv_label_set_text_static(label_temperature_high, "");
+  lv_label_set_text_static(label_temperature_high, "H--");
+
+  lv_obj_align(label_temperature_unit, lv_scr_act(), LV_ALIGN_IN_TOP_RIGHT, -8, 28);
+  lv_obj_align(label_temperature, label_temperature_unit, LV_ALIGN_OUT_LEFT_MID, -4, 2);
+  lv_obj_align(label_weather_icon, label_temperature, LV_ALIGN_OUT_LEFT_MID, -10, 0);
+  lv_obj_align(label_temperature_low, lv_scr_act(), LV_ALIGN_IN_TOP_LEFT, 105, 78);
+  lv_obj_align(label_temperature_high, lv_scr_act(), LV_ALIGN_IN_TOP_RIGHT, -8, 78);
 
   lv_style_init(&style_line);
   lv_style_set_line_width(&style_line, LV_STATE_DEFAULT, 2);
@@ -176,11 +194,6 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
   lv_line_set_points(line_time, line_time_points, 3);
   lv_obj_add_style(line_time, LV_LINE_PART_MAIN, &style_line);
   lv_obj_align(line_time, nullptr, LV_ALIGN_IN_BOTTOM_RIGHT, 0, -25);
-
-  label_time_ampm = lv_label_create(lv_scr_act(), nullptr);
-  lv_obj_set_style_local_text_color(label_time_ampm, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_label_set_text_static(label_time_ampm, "");
-  lv_obj_align(label_time_ampm, lv_scr_act(), LV_ALIGN_IN_LEFT_MID, 5, -5);
 
   backgroundLabel = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_set_click(backgroundLabel, true);
@@ -244,11 +257,11 @@ WatchFaceCasioStyleG7710::~WatchFaceCasioStyleG7710() {
   lv_style_reset(&style_line);
   lv_style_reset(&style_border);
 
-  if (font_dot40 != nullptr) {
+  if (font_dot40_loaded) {
     lv_font_free(font_dot40);
   }
 
-  if (font_segment115 != nullptr) {
+  if (font_segment115_loaded) {
     lv_font_free(font_segment115);
   }
 
@@ -272,7 +285,6 @@ void WatchFaceCasioStyleG7710::ApplyColor(lv_color_t color) {
   lv_obj_set_style_local_text_color(label_temperature_low, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_color(label_temperature_high, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_color(label_time, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-  lv_obj_set_style_local_text_color(label_time_ampm, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_color(stepValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_color(stepIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_obj_set_style_local_text_color(heartbeatValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
@@ -353,9 +365,12 @@ void WatchFaceCasioStyleG7710::Refresh() {
     CloseOverlay();
   }
 
+  bool statusBarDirty = false;
+
   powerPresent = batteryController.IsPowerPresent();
   if (powerPresent.IsUpdated()) {
     lv_label_set_text_static(batteryPlug, BatteryIcon::GetPlugIcon(powerPresent.Get()));
+    statusBarDirty = true;
   }
 
   batteryPercentRemaining = batteryController.PercentRemaining();
@@ -363,29 +378,35 @@ void WatchFaceCasioStyleG7710::Refresh() {
     auto batteryPercent = batteryPercentRemaining.Get();
     batteryIcon.SetBatteryPercentage(batteryPercent);
     lv_label_set_text_fmt(label_battery_value, "%d%%", batteryPercent);
+    statusBarDirty = true;
   }
 
   bleState = bleController.IsConnected();
   bleRadioEnabled = bleController.IsRadioEnabled();
   if (bleState.IsUpdated() || bleRadioEnabled.IsUpdated()) {
     lv_label_set_text_static(bleIcon, BleIcon::GetIcon(bleState.Get()));
+    statusBarDirty = true;
   }
 
   alarmEnabled = alarmController.IsEnabled();
   if (alarmEnabled.IsUpdated()) {
     lv_obj_set_hidden(alarmIcon, !alarmEnabled.Get());
+    statusBarDirty = true;
   }
-
-  lv_obj_realign(label_battery_value);
-  lv_obj_realign(batteryIcon.GetObject());
-  lv_obj_realign(batteryPlug);
-  lv_obj_realign(bleIcon);
-  lv_obj_realign(alarmIcon);
-  lv_obj_realign(notificationIcon);
 
   notificationState = notificatioManager.AreNewNotificationsAvailable();
   if (notificationState.IsUpdated()) {
     lv_label_set_text_static(notificationIcon, NotificationIcon::GetIcon(notificationState.Get()));
+    statusBarDirty = true;
+  }
+
+  if (statusBarDirty) {
+    lv_obj_realign(label_battery_value);
+    lv_obj_realign(batteryIcon.GetObject());
+    lv_obj_realign(batteryPlug);
+    lv_obj_realign(bleIcon);
+    lv_obj_realign(alarmIcon);
+    lv_obj_realign(notificationIcon);
   }
 
   currentDateTime = std::chrono::time_point_cast<std::chrono::minutes>(dateTimeController.CurrentDateTime());
@@ -394,17 +415,13 @@ void WatchFaceCasioStyleG7710::Refresh() {
     uint8_t minute = dateTimeController.Minutes();
 
     if (settingsController.GetClockType() == Controllers::Settings::ClockType::H12) {
-      char ampmChar[2] = "A";
+      // No A/P marker — 12h digits only.
       if (hour == 0) {
         hour = 12;
-      } else if (hour == 12) {
-        ampmChar[0] = 'P';
       } else if (hour > 12) {
         hour = hour - 12;
-        ampmChar[0] = 'P';
       }
-      lv_label_set_text(label_time_ampm, ampmChar);
-      lv_label_set_text_fmt(label_time, "%2d:%02d", hour, minute);
+      lv_label_set_text_fmt(label_time, "%d:%02d", hour, minute);
     } else {
       lv_label_set_text_fmt(label_time, "%02d:%02d", hour, minute);
     }
@@ -415,11 +432,7 @@ void WatchFaceCasioStyleG7710::Refresh() {
       Controllers::DateTime::Months month = dateTimeController.Month();
       uint8_t day = dateTimeController.Day();
 
-      if (settingsController.GetClockType() == Controllers::Settings::ClockType::H24) {
-        lv_label_set_text_fmt(label_date, "%d-%d", day, static_cast<uint8_t>(month));
-      } else {
-        lv_label_set_text_fmt(label_date, "%d-%d", static_cast<uint8_t>(month), day);
-      }
+      lv_label_set_text_fmt(label_date, "%d-%d", static_cast<uint8_t>(month), day);
 
       lv_label_set_text_fmt(label_day_of_week, "%s", dateTimeController.DayOfWeekShortToString());
 
@@ -444,20 +457,20 @@ void WatchFaceCasioStyleG7710::Refresh() {
       lv_label_set_text(label_weather_icon, Symbols::GetSymbol(optCurrentWeather->iconId, weatherService.IsNight()));
       lv_label_set_text_fmt(label_temperature_low, "L%d", tempMin);
       lv_label_set_text_fmt(label_temperature_high, "H%d", tempMax);
-
-      lv_obj_align(label_temperature_unit, lv_scr_act(), LV_ALIGN_IN_TOP_RIGHT, -8, 28);
-      lv_obj_align(label_temperature, label_temperature_unit, LV_ALIGN_OUT_LEFT_MID, -4, 2);
-      lv_obj_align(label_weather_icon, label_temperature, LV_ALIGN_OUT_LEFT_MID, -10, 0);
-
-      lv_obj_align(label_temperature_low, lv_scr_act(), LV_ALIGN_IN_TOP_LEFT, 105, 78);
-      lv_obj_align(label_temperature_high, lv_scr_act(), LV_ALIGN_IN_TOP_RIGHT, -8, 78);
     } else {
-      lv_label_set_text_static(label_temperature, "");
+      lv_label_set_text_static(label_temperature, "--");
       lv_label_set_text_static(label_temperature_unit, "");
       lv_label_set_text_static(label_weather_icon, "");
-      lv_label_set_text_static(label_temperature_low, "");
-      lv_label_set_text_static(label_temperature_high, "");
+      lv_label_set_text_static(label_temperature_low, "L--");
+      lv_label_set_text_static(label_temperature_high, "H--");
     }
+
+    lv_obj_align(label_temperature_unit, lv_scr_act(), LV_ALIGN_IN_TOP_RIGHT, -8, 28);
+    lv_obj_align(label_temperature, label_temperature_unit, LV_ALIGN_OUT_LEFT_MID, -4, 2);
+    lv_obj_align(label_weather_icon, label_temperature, LV_ALIGN_OUT_LEFT_MID, -10, 0);
+
+    lv_obj_align(label_temperature_low, lv_scr_act(), LV_ALIGN_IN_TOP_LEFT, 105, 78);
+    lv_obj_align(label_temperature_high, lv_scr_act(), LV_ALIGN_IN_TOP_RIGHT, -8, 78);
   }
 
   heartbeat = heartRateController.HeartRate();
