@@ -14,16 +14,19 @@ cp tools/infinisim-patches/HeartRateController.cpp "$INFINSIM/sim/components/hea
 ```
 
 Also required in InfiniSim (not always copied as files — keep in your InfiniSim working tree):
-- `main.cpp`: PPGv2 `HeartRateTask` ctor, `NoInit_Persistence`, no “Screen is OFF” overlay, boot `DisableSleeping`
+- `main.cpp`: PPGv2 `HeartRateTask` ctor, `NoInit_Persistence`, no “Screen is OFF” overlay, boot `DisableSleeping`, `--casio-preview` injects weather, `--scroll-smoke` exercises Settings Up/Down
+- `sim/displayapp/LittleVgl.cpp`: `MoveScreen` scrolls `monitor.tft_fb` with `memmove` only (no SDL from DisplayApp)
 - `sim/nrfx/hal/nrf_gpio.cpp`: latched button GPIO (`nrf_gpio_sim_set_button`)
 - `sim/task.cpp`: `vTaskDelay` converts ticks → ms
 - `CMakeLists.txt`: `INFINITIME_SIMULATOR=1`, `MONITOR_ZOOM=2`
+- `lv_drivers/display/monitor.c`: present only via main-thread `monitor_sdl_ui_update()`
 
 ## What changed
 - **queue / semphr** — thread-safe FreeRTOS shims + recursive mutex for FS locks
 - **HeartRate\*** — PPGv2 ctor/states + charging pause messages
 - **InfiniTime DisplayApp** — dim/sleep compiled out when `INFINITIME_SIMULATOR` is set
 - **InfiniTime SystemTask** — always re-poke DisplayApp on `GoToRunning` (fixes Idle/Running desync)
+- **MoveScreen** — Settings (and Launcher/Notifications) Up/Down scroll used to call `SDL_RenderReadPixels` from DisplayApp and leak surfaces → black window on Wayland/X11. Fixed by scrolling `tft_fb` in memory; Present stays on main.
 
 ## Known-good run
 
@@ -48,13 +51,23 @@ Keys: `3` Casio Custom, `1` Digital, `i` screenshot, `w` inject weather, right-c
 
 **README / doc screenshots:** Casio Custom is weather-first. Always press `w` (or use `--casio-preview`, which injects weather) before capturing; otherwise the PNG looks mostly empty on the right.
 
-If the window is a **black box**: rebuild InfiniSim with the main-thread `monitor_sdl_ui_update()` present fix and use `run-infinisim.sh`.
+If the window is a **black box**:
+- Rebuild InfiniSim with the main-thread `monitor_sdl_ui_update()` present fix and use `run-infinisim.sh`.
+- If it dies when opening/scrolling **Settings** (or Launcher/Notifications Up/Down), rebuild with the `MoveScreen` `tft_fb` memmove fix (off-thread SDL was the cause).
 
 One-shot Casio PNG (with weather):
 
 ```bash
 cd /home/dethbox/Projects/build_lv_sim
 SDL_VIDEODRIVER=x11 ./infinisim --casio-preview /tmp/casio.png
+```
+
+Settings scroll smoke (writes PNGs; should stay non-black):
+
+```bash
+cd /home/dethbox/Projects/build_lv_sim
+mkdir -p /tmp/scroll-smoke
+SDL_VIDEODRIVER=x11 ./infinisim --scroll-smoke /tmp/scroll-smoke
 ```
 
 Preferred long-term: personal InfiniSim fork so patches are not re-copied.
