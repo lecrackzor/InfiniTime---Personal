@@ -46,6 +46,9 @@ chmod +x /home/dethbox/Projects/InfiniTime---Personal/tools/infinisim-patches/ru
 
 Keys: `3` Casio Custom, `1` Digital, `i` screenshot, right-click = side button.
 
+If the window is a **black box**: you are on an old binary, or SDL present was off-thread.
+Rebuild InfiniSim (monitor.c present-from-main fix) and use `run-infinisim.sh` above.
+
 One-shot Casio PNG (no interaction):
 
 ```bash
