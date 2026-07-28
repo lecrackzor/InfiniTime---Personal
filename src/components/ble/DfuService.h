@@ -31,6 +31,8 @@ namespace Pinetime {
       void Init();
       int OnServiceData(uint16_t connectionHandle, uint16_t attributeHandle, ble_gatt_access_ctxt* context);
       void OnTimeout();
+      void OnPrepTimeout();
+      void OnDisconnect();
       void Reset();
 
       class NotificationManager {
@@ -162,7 +164,16 @@ namespace Pinetime {
       int WritePacketHandler(uint16_t connectionHandle, os_mbuf* om);
       int ControlPointHandler(uint16_t connectionHandle, os_mbuf* om);
 
+      void EnsurePrepAwake();
+      void ReleasePrepAwake();
+
       TimerHandle_t timeoutTimer;
+      // Keeps the watch awake from first DFU GATT access until StartDFU / timeout / disconnect
+      TimerHandle_t prepTimeoutTimer;
+      bool prepWakeHeld = false;
+      // True after BleFirmwareUpdateStarted is queued (pairs with BleFirmwareUpdateFinished)
+      bool updateLockHeld = false;
+      static constexpr uint32_t prepTimeoutMs = 60000;
     };
   }
 }

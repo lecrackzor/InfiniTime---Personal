@@ -98,6 +98,9 @@ App polish:
 - Alarm settings: only `DirClose` when `DirOpen` succeeded
 - Music: initialize play/position members; return metadata by const ref (no per-refresh string copies)
 - DFU: keep version `0x0008` separate from GATT handles; stop re-resolving chars on every access
+- DFU: wake lock from first DFU GATT access (60s prep timeout) so the watch does not sleep while Gadgetbridge connects / discovers before `StartDFU`
+
+**DFU keep-awake check (on watch):** Firmware & files Enabled; screen timeout 5s; start GB install after the face dims — watch should wake/stay awake through discovery; abort mid-prep → sleep returns within ~60s; full OTA still validates.
 - SystemTask: grow main stack 350→400 words (margin for upstream [#2407](https://github.com/InfiniTimeOrg/InfiniTime/issues/2407) worst-case)
 - Pairing: vibrate only when first showing PassKey
 - Notifications / HR controller: defensive empty-message and null-service guards

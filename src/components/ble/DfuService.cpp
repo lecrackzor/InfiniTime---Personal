@@ -29,6 +29,11 @@ void TimeoutTimerCallback(TimerHandle_t xTimer) {
   dfuService->OnTimeout();
 }
 
+void PrepTimeoutTimerCallback(TimerHandle_t xTimer) {
+  auto dfuService = static_cast<DfuService*>(pvTimerGetTimerID(xTimer));
+  dfuService->OnPrepTimeout();
+}
+
 DfuService::DfuService(Pinetime::System::SystemTask& systemTask,
                        Pinetime::Controllers::Ble& bleController,
                        Pinetime::Drivers::SpiNorFlash& spiNorFlash)
@@ -66,7 +71,8 @@ DfuService::DfuService(Pinetime::System::SystemTask& systemTask,
        .characteristics = characteristicDefinition},
       {0},
     } {
-  timeoutTimer = xTimerCreate("notificationTimer", 10000, pdFALSE, this, TimeoutTimerCallback);
+  timeoutTimer = xTimerCreate("dfuTimeout", pdMS_TO_TICKS(10000), pdFALSE, this, TimeoutTimerCallback);
+  prepTimeoutTimer = xTimerCreate("dfuPrepTimeout", pdMS_TO_TICKS(prepTimeoutMs), pdFALSE, this, PrepTimeoutTimerCallback);
 }
 
 void DfuService::Init() {
@@ -91,6 +97,9 @@ int DfuService::OnServiceData(uint16_t connectionHandle, uint16_t attributeHandl
     return BLE_ATT_ERR_INSUFFICIENT_AUTHOR;
   }
 #endif
+
+  // Wake early for GB connect/discovery before StartDFU (mirrors BLE FS wake pattern)
+  EnsurePrepAwake();
 
   if (bleController.IsFirmwareUpdating()) {
     xTimerStart(timeoutTimer, 0);
@@ -135,9 +144,7 @@ int DfuService::WritePacketHandler(uint16_t connectionHandle, os_mbuf* om) {
                    bootloaderSize,
                    applicationSize);
 
-      // Wait until SystemTask has disabled sleeping
-      // This isn't quite correct, as we don't actually know
-      // if BleFirmwareUpdateStarted has been received yet
+      // Wait until SystemTask has disabled sleeping (prep wake lock and/or BleFirmwareUpdateStarted)
       while (!systemTask.IsSleepDisabled()) {
         vTaskDelay(pdMS_TO_TICKS(5));
       }
@@ -226,7 +233,12 @@ int DfuService::ControlPointHandler(uint16_t connectionHandle, os_mbuf* om) {
         bleController.State(Pinetime::Controllers::Ble::FirmwareUpdateStates::Running);
         bleController.FirmwareUpdateTotalBytes(0xffffffffu);
         bleController.FirmwareUpdateCurrentBytes(0);
+        // Prep lock remains held; BleFirmwareUpdateStarted takes a second lock for the transfer.
+        // Both are released in Reset() (ReleasePrepAwake + BleFirmwareUpdateFinished).
+        xTimerStop(prepTimeoutTimer, 0);
         systemTask.PushMessage(Pinetime::System::Messages::BleFirmwareUpdateStarted);
+        updateLockHeld = true;
+        xTimerStart(timeoutTimer, 0);
         return 0;
       } else {
         NRF_LOG_INFO("[DFU] -> Start DFU, mode %d not supported!", imageType);
@@ -313,6 +325,50 @@ void DfuService::OnTimeout() {
   Reset();
 }
 
+void DfuService::OnPrepTimeout() {
+  NRF_LOG_INFO("[DFU] -> Prep wake timeout (no StartDFU)");
+  if (bleController.IsFirmwareUpdating()) {
+    // Should not happen — prep timer is stopped on StartDFU — but be safe
+    OnTimeout();
+    return;
+  }
+  ReleasePrepAwake();
+}
+
+void DfuService::OnDisconnect() {
+  if (bleController.IsFirmwareUpdating()) {
+    bleController.State(Pinetime::Controllers::Ble::FirmwareUpdateStates::Error);
+    Reset();
+  } else {
+    ReleasePrepAwake();
+  }
+}
+
+void DfuService::EnsurePrepAwake() {
+  if (!prepWakeHeld) {
+    systemTask.PushMessage(Pinetime::System::Messages::DisableSleeping);
+    while (!systemTask.IsSleepDisabled()) {
+      vTaskDelay(pdMS_TO_TICKS(5));
+    }
+    prepWakeHeld = true;
+    NRF_LOG_INFO("[DFU] -> Prep wake lock acquired");
+  }
+  // (Re)arm prep timeout while still waiting for StartDFU
+  if (!bleController.IsFirmwareUpdating()) {
+    xTimerStart(prepTimeoutTimer, 0);
+  }
+}
+
+void DfuService::ReleasePrepAwake() {
+  xTimerStop(prepTimeoutTimer, 0);
+  if (!prepWakeHeld) {
+    return;
+  }
+  prepWakeHeld = false;
+  systemTask.PushMessage(Pinetime::System::Messages::EnableSleeping);
+  NRF_LOG_INFO("[DFU] -> Prep wake lock released");
+}
+
 void DfuService::Reset() {
   state = States::Idle;
   nbPacketsToNotify = 0;
@@ -323,8 +379,14 @@ void DfuService::Reset() {
   applicationSize = 0;
   expectedCrc = 0;
   notificationManager.Reset();
+  xTimerStop(timeoutTimer, 0);
+  ReleasePrepAwake();
   bleController.StopFirmwareUpdate();
-  systemTask.PushMessage(Pinetime::System::Messages::BleFirmwareUpdateFinished);
+  // Only pair Finished with a prior Started — avoids wakeLocksHeld underflow
+  if (updateLockHeld) {
+    updateLockHeld = false;
+    systemTask.PushMessage(Pinetime::System::Messages::BleFirmwareUpdateFinished);
+  }
 }
 
 DfuService::NotificationManager::NotificationManager() {

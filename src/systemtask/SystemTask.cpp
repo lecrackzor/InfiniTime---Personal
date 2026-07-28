@@ -248,6 +248,8 @@ void SystemTask::Work() {
           bleDiscoveryTimer = 5;
           break;
         case Messages::BleFirmwareUpdateStarted:
+          // DfuService may already hold a prep wake lock (DisableSleeping) from first GATT access.
+          // This increments a second lock for the transfer; both are released in DfuService::Reset().
           GoToRunning();
           wakeLocksHeld++;
           displayApp.PushMessage(Pinetime::Applications::Display::Messages::BleFirmwareUpdateStarted);
