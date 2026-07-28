@@ -2,7 +2,7 @@
 
 Personal [InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime) fork for the PineTime. Built on upstream `main`; this page only covers what differs.
 
-![Casio Custom — Warm Cockpit preview](doc/personal/casio-custom-two-font.png)
+![Casio Custom — Warm Cockpit](doc/personal/casio-custom-warm-cockpit.png)
 
 ## Changes vs upstream
 
@@ -28,7 +28,7 @@ Personal [InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime) fork for the 
 - No AM/PM letter on the face (12h still shows 1–12 digits only)
 - **Two flash fonts** (PPGv2 RAM headroom): `7segments_115` for the big time + `lv_font_dots_40` for date/day/temp; dropped `7segments_40`. L/H still use built-in JetBrains Bold 20
 
-InfiniSim README screenshots of this face must inject weather (`w` in the sim, or `--casio-preview` which does it automatically); without weather the right side shows `--` placeholders.
+InfiniSim README screenshots of this face should populate weather, HR, and steps (`--casio-preview` does this automatically, or use `w` / `h` / `s` in the sim); empty weather shows `--` placeholders.
 
 ### Watch faces
 Built into firmware: **Digital**, **Terminal**, **Casio Custom** (default for factory / wiped settings).
