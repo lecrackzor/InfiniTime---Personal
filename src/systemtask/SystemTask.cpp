@@ -432,6 +432,9 @@ void SystemTask::Work() {
 
 void SystemTask::GoToRunning() {
   if (state == SystemTaskState::Running) {
+    // DisplayApp can be Idle while SystemTask already thinks it is Running
+    // (message reordering under InfiniSim's SDL threads). Always re-poke it.
+    displayApp.PushMessage(Pinetime::Applications::Display::Messages::GoToRunning);
     return;
   }
   if (state == SystemTaskState::Sleeping || state == SystemTaskState::AODSleeping) {

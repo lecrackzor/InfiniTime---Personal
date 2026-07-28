@@ -268,6 +268,7 @@ void DisplayApp::Refresh() {
         }
         queueTimeout = lv_task_handler();
 
+#if !defined(INFINITIME_SIMULATOR)
         if (!systemTask->IsSleepDisabled() && IsPastDimTime()) {
           if (!isDimmed) {
             isDimmed = true;
@@ -292,6 +293,7 @@ void DisplayApp::Refresh() {
           isDimmed = false;
           ApplyBrightness();
         }
+#endif
         break;
       default:
         queueTimeout = portMAX_DELAY;
