@@ -63,4 +63,5 @@ Keys: `3` Casio Custom, `1` Digital, `2` Terminal, `i` screenshot, `w` inject we
 
 **README / doc screenshots:** Casio Custom is weather-first. Always press `w` before capturing; otherwise the PNG looks mostly empty on the right.
 
-Preferred long-term: personal InfiniSim fork so patches are not re-copied.
+Personal InfiniSim fork (patches already applied on `main`):
+https://github.com/lecrackzor/InfiniSim---Personal

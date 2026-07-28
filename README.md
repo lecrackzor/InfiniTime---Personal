@@ -2,7 +2,7 @@
 
 Personal [InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime) fork for the PineTime. Built on upstream `main`; this page only covers what differs.
 
-![Casio Custom color cycling](doc/personal/casio-custom-color-cycle.gif)
+![Casio Custom — Warm Cockpit preview](doc/personal/casio-custom-two-font.png)
 
 ## Changes vs upstream
 
@@ -11,6 +11,7 @@ Personal [InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime) fork for the 
 - **Start** state persists across reboot (so background HR keeps working after power cycle)
 - Pauses while charging; resumes when unplugged
 - Watch faces no longer show a bogus `0` BPM while measuring / waiting for a valid sample
+- While PPG is re-acquiring, keep the last known BPM on screen (only clear when nothing was shown yet)
 - **PPGv2** heart-rate algorithm ([upstream #2371](https://github.com/InfiniTimeOrg/InfiniTime/pull/2371)): motion-adaptive filtering, auto gain/drive, reports failure instead of wrong BPM
 - PPGv2: still run AGC / background timeout when `hrs == 0` so off-wrist no-touch cannot spin the green LED forever
 
@@ -26,8 +27,6 @@ Personal [InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime) fork for the 
 - Flash font load falls back to built-in JetBrains if `lv_font_load` fails
 - No AM/PM letter on the face (12h still shows 1–12 digits only)
 - **Two flash fonts** (PPGv2 RAM headroom): `7segments_115` for the big time + `lv_font_dots_40` for date/day/temp; dropped `7segments_40`. L/H still use built-in JetBrains Bold 20
-
-![Casio Custom two-font InfiniSim preview](doc/personal/casio-custom-two-font.png)
 
 InfiniSim README screenshots of this face must inject weather (`w` in the sim, or `--casio-preview` which does it automatically); without weather the right side shows `--` placeholders.
 
@@ -104,7 +103,9 @@ App polish:
 - Notifications / HR controller: defensive empty-message and null-service guards
 
 ### InfiniSim
-Local InfiniSim patches (queue segfault fix + HR charging message enums) live in [`tools/infinisim-patches/`](tools/infinisim-patches/). Prefer keeping them on a personal InfiniSim fork once created.
+Companion simulator: [InfiniSim---Personal](https://github.com/lecrackzor/InfiniSim---Personal) (trimmed faces/apps, PPGv2 HR, Warm Cockpit Casio keys).
+
+Apply / refresh helpers still live in [`tools/infinisim-patches/`](tools/infinisim-patches/) (`apply-personal-sim.py`, `run-infinisim.sh`) for rebuilding a local InfiniSim tree against this firmware.
 
 ## Upstream
 
