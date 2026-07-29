@@ -52,9 +52,7 @@ TwiMaster::ErrorCodes TwiMaster::Read(uint8_t deviceAddress, uint8_t registerAdd
   xSemaphoreTake(mutex, portMAX_DELAY);
   Wakeup();
   auto ret = Write(deviceAddress, &registerAddress, 1, false);
-  if (ret == ErrorCodes::NoError) {
-    ret = Read(deviceAddress, data, size, true);
-  }
+  ret = Read(deviceAddress, data, size, true);
   Sleep();
   xSemaphoreGive(mutex);
   return ret;
@@ -109,9 +107,6 @@ TwiMaster::ErrorCodes TwiMaster::Read(uint8_t deviceAddress, uint8_t* buffer, si
 
   if (twiBaseAddress->EVENTS_ERROR) {
     twiBaseAddress->EVENTS_ERROR = 0x0UL;
-    uint32_t error = twiBaseAddress->ERRORSRC;
-    twiBaseAddress->ERRORSRC = error;
-    return ErrorCodes::TransactionFailed;
   }
   return ErrorCodes::NoError;
 }
@@ -155,7 +150,6 @@ TwiMaster::ErrorCodes TwiMaster::Write(uint8_t deviceAddress, const uint8_t* dat
     twiBaseAddress->EVENTS_ERROR = 0x0UL;
     uint32_t error = twiBaseAddress->ERRORSRC;
     twiBaseAddress->ERRORSRC = error;
-    return ErrorCodes::TransactionFailed;
   }
 
   return ErrorCodes::NoError;

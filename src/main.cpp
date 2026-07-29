@@ -101,12 +101,12 @@ Pinetime::Controllers::Settings settingsController {fs};
 Pinetime::Controllers::MotorController motorController {};
 
 Pinetime::Controllers::HeartRateController heartRateController;
-Pinetime::Controllers::MotionController motionController;
-Pinetime::Applications::HeartRateTask heartRateApp(heartRateSensor, heartRateController, settingsController, motionController);
+Pinetime::Applications::HeartRateTask heartRateApp(heartRateSensor, heartRateController, settingsController, motionSensor);
 
 Pinetime::Controllers::DateTime dateTimeController {settingsController};
 Pinetime::Drivers::Watchdog watchdog;
 Pinetime::Controllers::NotificationManager notificationManager;
+Pinetime::Controllers::MotionController motionController;
 Pinetime::Controllers::StopWatchController stopWatchController;
 Pinetime::Controllers::AlarmController alarmController {dateTimeController, fs};
 Pinetime::Controllers::TouchHandler touchHandler;

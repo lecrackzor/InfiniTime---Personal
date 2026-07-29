@@ -1,9 +1,10 @@
 #pragma once
 #include <drivers/Bma421_C/bma4_defs.h>
-#include "drivers/TwiMaster.h"
 
 namespace Pinetime {
   namespace Drivers {
+    class TwiMaster;
+
     class Bma421 {
     public:
       enum class DeviceTypes : uint8_t { Unknown, BMA421, BMA425 };
@@ -28,8 +29,8 @@ namespace Pinetime {
       Values Process();
       void ResetStepCounter();
 
-      TwiMaster::ErrorCodes Read(uint8_t registerAddress, uint8_t* buffer, size_t size);
-      TwiMaster::ErrorCodes Write(uint8_t registerAddress, const uint8_t* data, size_t size);
+      void Read(uint8_t registerAddress, uint8_t* buffer, size_t size);
+      void Write(uint8_t registerAddress, const uint8_t* data, size_t size);
 
       bool IsOk() const;
       DeviceTypes DeviceType() const;

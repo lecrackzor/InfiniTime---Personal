@@ -7,11 +7,11 @@
 #include "components/heartrate/Ppg.h"
 #include "components/settings/Settings.h"
 #include "components/heartrate/HeartRateController.h"
-#include "components/motion/MotionController.h"
 
 namespace Pinetime {
   namespace Drivers {
     class Hrs3300;
+    class Bma421;
   }
 
   namespace Applications {
@@ -21,7 +21,7 @@ namespace Pinetime {
       explicit HeartRateTask(Drivers::Hrs3300& heartRateSensor,
                              Controllers::HeartRateController& controller,
                              Controllers::Settings& settings,
-                             Controllers::MotionController& motionController);
+                             Pinetime::Drivers::Bma421& motionSensor);
       void Start();
       void Work();
       void PushMessage(Messages msg);
@@ -50,7 +50,7 @@ namespace Pinetime {
       Drivers::Hrs3300& heartRateSensor;
       Controllers::HeartRateController& controller;
       Controllers::Settings& settings;
-      Controllers::MotionController& motionController;
+      Drivers::Bma421& motionSensor;
       Controllers::Ppg ppg;
       TickType_t lastMeasurementTime;
       TickType_t measurementStartTime;

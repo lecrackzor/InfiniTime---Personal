@@ -9,14 +9,14 @@ using namespace Pinetime::Drivers;
 namespace {
   int8_t user_i2c_read(uint8_t reg_addr, uint8_t* reg_data, uint32_t length, void* intf_ptr) {
     auto bma421 = static_cast<Bma421*>(intf_ptr);
-    auto err = bma421->Read(reg_addr, reg_data, length);
-    return (err == TwiMaster::ErrorCodes::NoError) ? 0 : -1;
+    bma421->Read(reg_addr, reg_data, length);
+    return 0;
   }
 
   int8_t user_i2c_write(uint8_t reg_addr, const uint8_t* reg_data, uint32_t length, void* intf_ptr) {
     auto bma421 = static_cast<Bma421*>(intf_ptr);
-    auto err = bma421->Write(reg_addr, reg_data, length);
-    return (err == TwiMaster::ErrorCodes::NoError) ? 0 : -1;
+    bma421->Write(reg_addr, reg_data, length);
+    return 0;
   }
 
   void user_delay(uint32_t period_us, void* /*intf_ptr*/) {
@@ -101,12 +101,12 @@ void Bma421::Reset() {
   twiMaster.Write(deviceAddress, 0x7E, &data, 1);
 }
 
-TwiMaster::ErrorCodes Bma421::Read(uint8_t registerAddress, uint8_t* buffer, size_t size) {
-  return twiMaster.Read(deviceAddress, registerAddress, buffer, size);
+void Bma421::Read(uint8_t registerAddress, uint8_t* buffer, size_t size) {
+  twiMaster.Read(deviceAddress, registerAddress, buffer, size);
 }
 
-TwiMaster::ErrorCodes Bma421::Write(uint8_t registerAddress, const uint8_t* data, size_t size) {
-  return twiMaster.Write(deviceAddress, registerAddress, data, size);
+void Bma421::Write(uint8_t registerAddress, const uint8_t* data, size_t size) {
+  twiMaster.Write(deviceAddress, registerAddress, data, size);
 }
 
 Bma421::Values Bma421::Process() {

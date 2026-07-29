@@ -463,10 +463,10 @@ void WatchFaceCasioStyleG7710::Refresh() {
 
   heartbeat = heartRateController.HeartRate();
   heartbeatRunning = heartRateController.State() != Controllers::HeartRateController::States::Disabled;
-  // Always refresh HR UI — state can leave Ready without changing the BPM value (Searching/Stopped).
+  // Show held BPM while Searching/NotEnoughData; blank only until the first sample lands.
   if (heartbeatRunning.Get()) {
     lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorHeart);
-    if (heartRateController.State() == Controllers::HeartRateController::States::Ready && heartbeat.Get() > 0) {
+    if (heartbeat.Get() > 0) {
       lv_label_set_text_fmt(heartbeatValue, "%d", heartbeat.Get());
     } else {
       lv_label_set_text_static(heartbeatValue, "");

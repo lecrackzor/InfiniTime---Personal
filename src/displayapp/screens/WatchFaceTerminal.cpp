@@ -142,10 +142,10 @@ void WatchFaceTerminal::Refresh() {
 
   heartbeat = heartRateController.HeartRate();
   heartbeatRunning = heartRateController.State() != Controllers::HeartRateController::States::Disabled;
-  // Always refresh — Ready→Searching keeps the same BPM value but must show ---.
+  // Show held BPM while Searching/NotEnoughData; --- only until the first sample lands.
   if (heartbeatRunning.Get()) {
     lv_obj_set_style_local_text_color(heartbeatValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, Colors::deepOrange);
-    if (heartRateController.State() == Controllers::HeartRateController::States::Ready && heartbeat.Get() > 0) {
+    if (heartbeat.Get() > 0) {
       lv_label_set_text_fmt(heartbeatValue, "#ffffff [L_HR]# %d bpm", heartbeat.Get());
     } else {
       lv_label_set_text_static(heartbeatValue, "#ffffff [L_HR]# ---");

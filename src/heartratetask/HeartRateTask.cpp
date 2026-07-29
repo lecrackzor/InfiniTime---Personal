@@ -1,6 +1,7 @@
 #include "heartratetask/HeartRateTask.h"
 #include <components/heartrate/HeartRateController.h>
 #include <drivers/Hrs3300.h>
+#include <drivers/Bma421.h>
 #include <limits>
 #include <optional>
 #include <cstdlib>
@@ -99,8 +100,8 @@ TickType_t HeartRateTask::CurrentTaskDelay() {
 HeartRateTask::HeartRateTask(Drivers::Hrs3300& heartRateSensor,
                              Controllers::HeartRateController& controller,
                              Controllers::Settings& settings,
-                             Controllers::MotionController& motionController)
-  : heartRateSensor {heartRateSensor}, controller {controller}, settings {settings}, motionController {motionController} {
+                             Drivers::Bma421& motionSensor)
+  : heartRateSensor {heartRateSensor}, controller {controller}, settings {settings}, motionSensor {motionSensor} {
 }
 
 void HeartRateTask::Start() {
@@ -255,7 +256,8 @@ void HeartRateTask::StopMeasurement() {
 
 void HeartRateTask::HandleSensorData() {
   auto sensorData = heartRateSensor.ReadHrsAls();
-  // Use SystemTask's motion snapshot (~10 Hz) — avoid a second BMA421 Process() on the shared TWI bus.
+  // Sample accel at the PPG rate — PPGv2 motion adaptive filter needs fresh axes per ingest.
+  auto motionValues = motionSensor.Process();
 
   // Always run AGC / no-touch — even when hrs is 0.
   // Skipping AutoGain on hrs==0 (old "sensor starting up" early-return) left NoTouch
@@ -287,7 +289,7 @@ void HeartRateTask::HandleSensorData() {
     }
 
     if (hrsSample != 0) {
-      ppg.Ingest(hrsSample, motionController.X(), motionController.Y(), motionController.Z());
+      ppg.Ingest(hrsSample, motionValues.x, motionValues.y, motionValues.z);
 
       bpm = ppg.HeartRate();
       if (bpm.has_value()) {
