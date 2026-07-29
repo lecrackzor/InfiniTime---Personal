@@ -31,6 +31,7 @@ namespace Pinetime {
       uint8_t ReadSecurityRegister();
       bool ProgramFailed();
       bool EraseFailed();
+      bool ReadFailed() const;
 
       Identification GetIdentification() const;
 
@@ -59,6 +60,7 @@ namespace Pinetime {
 
       Spi& spi;
       Identification device_id;
+      bool lastReadOk = true;
     };
   }
 }

@@ -339,17 +339,20 @@ namespace Pinetime {
         dfuAndFsEnabledTillReboot = (mode == DfuAndFsMode::EnabledTillReboot);
       };
 
-      DfuAndFsMode GetDfuAndFsMode() {
+      [[nodiscard]] DfuAndFsMode GetDfuAndFsMode() const {
         if (dfuAndFsEnabledTillReboot) {
-          if (settings.dfuAndFsEnabledOnBoot) { // ensure both variables are in consistent state
-            settingsChanged = true;
-            settings.dfuAndFsEnabledOnBoot = false;
-            NRF_LOG_ERROR("Settings: DfuAndFsMode data corrupted");
-          }
           return DfuAndFsMode::EnabledTillReboot;
         }
         return (settings.dfuAndFsEnabledOnBoot ? DfuAndFsMode::Enabled : DfuAndFsMode::Disabled);
       };
+
+      void RepairDfuAndFsModeConsistency() {
+        if (dfuAndFsEnabledTillReboot && settings.dfuAndFsEnabledOnBoot) {
+          settingsChanged = true;
+          settings.dfuAndFsEnabledOnBoot = false;
+          NRF_LOG_ERROR("Settings: DfuAndFsMode data corrupted");
+        }
+      }
 
       std::optional<uint16_t> GetHeartRateBackgroundMeasurementInterval() const {
         if (settings.heartRateBackgroundPeriod == std::numeric_limits<uint16_t>::max()) {

@@ -314,9 +314,20 @@ void DisplayApp::Refresh() {
         if (state != States::Running || !systemTask->IsSleeping()) {
           break;
         }
-        while (brightnessController.Level() != Controllers::BrightnessController::Levels::Low) {
-          brightnessController.Lower();
-          vTaskDelay(100);
+        {
+          bool cancelled = false;
+          while (brightnessController.Level() != Controllers::BrightnessController::Levels::Low) {
+            Messages pending {};
+            if (xQueuePeek(msgQueue, &pending, 0) == pdTRUE && pending == Messages::GoToRunning) {
+              cancelled = true;
+              break;
+            }
+            brightnessController.Lower();
+            vTaskDelay(100);
+          }
+          if (cancelled) {
+            break;
+          }
         }
         // Turn brightness down (or set to AlwaysOn mode)
         if (msg == Messages::GoToAOD) {

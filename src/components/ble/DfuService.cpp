@@ -99,8 +99,11 @@ int DfuService::OnServiceData(uint16_t connectionHandle, uint16_t attributeHandl
   }
 #endif
 
-  // Wake early for GB connect/discovery before StartDFU (mirrors BLE FS wake pattern)
-  EnsurePrepAwake();
+  // Wake early for GB connect/discovery before StartDFU (mirrors BLE FS wake pattern).
+  // Skip once transfer is underway — BleFirmwareUpdateStarted already holds the wake lock.
+  if (!bleController.IsFirmwareUpdating()) {
+    EnsurePrepAwake();
+  }
 
   if (bleController.IsFirmwareUpdating()) {
     xTimerStart(timeoutTimer, 0);
@@ -211,6 +214,10 @@ int DfuService::WritePacketHandler(uint16_t connectionHandle, os_mbuf* om) {
     case States::Data: {
       // Image Init() only accepts 20-byte Nordic DFU chunks.
       if (om->om_len == 0 || om->om_len > 20) {
+        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+      }
+      if (bytesReceived + om->om_len > applicationSize) {
+        NRF_LOG_INFO("[DFU] -> Rejected oversize data packet (%d + %d > %d)", bytesReceived, om->om_len, applicationSize);
         return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
       }
       nbPacketReceived++;
@@ -492,6 +499,10 @@ void DfuService::DfuImage::Append(uint8_t* data, size_t size) {
     return;
   }
   ASSERT(size <= 20);
+  if (totalWriteIndex + bufferWriteIndex + size > totalSize) {
+    ready = false;
+    return;
+  }
 
   std::memcpy(tempBuffer + bufferWriteIndex, data, size);
   bufferWriteIndex += size;

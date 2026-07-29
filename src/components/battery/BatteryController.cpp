@@ -30,13 +30,19 @@ void Battery::MeasureVoltage() {
   ReadPowerState();
 
   if (isReading) {
-    return;
+    // Previous SAADC conversion never completed — recover so battery % cannot freeze forever.
+    nrfx_saadc_uninit();
+    isReading = false;
   }
-  // Non blocking read
+
   isReading = true;
   SaadcInit();
 
-  nrfx_saadc_sample();
+  const nrfx_err_t err = nrfx_saadc_sample();
+  if (err != NRFX_SUCCESS) {
+    nrfx_saadc_uninit();
+    isReading = false;
+  }
 }
 
 void Battery::AdcCallbackStatic(nrfx_saadc_evt_t const* event) {

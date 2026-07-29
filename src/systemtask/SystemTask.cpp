@@ -279,24 +279,7 @@ void SystemTask::Work() {
           // TODO add intent of fs access icon or something
           break;
         case Messages::OnTouchEvent:
-          // Finish immediately if no new events
-          if (!touchHandler.ProcessTouchInfo(touchPanel.GetTouchInfo())) {
-            break;
-          }
-          if (state == SystemTaskState::Running) {
-            displayApp.PushMessage(Pinetime::Applications::Display::Messages::TouchEvent);
-          } else {
-            // If asleep, check for touch panel wake triggers
-            auto gesture = touchHandler.GestureGet();
-            if (settingsController.GetNotificationStatus() != Controllers::Settings::Notification::Sleep &&
-                gesture != Pinetime::Applications::TouchEvents::None &&
-                ((gesture == Pinetime::Applications::TouchEvents::DoubleTap &&
-                  settingsController.isWakeUpModeOn(Pinetime::Controllers::Settings::WakeUpMode::DoubleTap)) ||
-                 (gesture == Pinetime::Applications::TouchEvents::Tap &&
-                  settingsController.isWakeUpModeOn(Pinetime::Controllers::Settings::WakeUpMode::SingleTap)))) {
-              GoToRunning();
-            }
-          }
+          HandleTouchEvent();
           break;
         case Messages::HandleButtonEvent: {
           Controllers::ButtonActions action = Controllers::ButtonActions::None;
@@ -410,6 +393,10 @@ void SystemTask::Work() {
         default:
           break;
       }
+    }
+    if (pendingTouchEvent) {
+      pendingTouchEvent = false;
+      HandleTouchEvent();
     }
     elapsed = xTaskGetTickCount() - lastStateUpdate;
     if (elapsed >= stateUpdatePeriod) {
@@ -543,10 +530,36 @@ void SystemTask::HandleButtonAction(Controllers::ButtonActions action) {
   fastWakeUpDone = false;
 }
 
+void SystemTask::HandleTouchEvent() {
+  // Finish immediately if no new events
+  if (!touchHandler.ProcessTouchInfo(touchPanel.GetTouchInfo())) {
+    return;
+  }
+  if (state == SystemTaskState::Running) {
+    displayApp.PushMessage(Pinetime::Applications::Display::Messages::TouchEvent);
+  } else {
+    // If asleep, check for touch panel wake triggers
+    auto gesture = touchHandler.GestureGet();
+    if (settingsController.GetNotificationStatus() != Controllers::Settings::Notification::Sleep &&
+        gesture != Pinetime::Applications::TouchEvents::None &&
+        ((gesture == Pinetime::Applications::TouchEvents::DoubleTap &&
+          settingsController.isWakeUpModeOn(Pinetime::Controllers::Settings::WakeUpMode::DoubleTap)) ||
+         (gesture == Pinetime::Applications::TouchEvents::Tap &&
+          settingsController.isWakeUpModeOn(Pinetime::Controllers::Settings::WakeUpMode::SingleTap)))) {
+      GoToRunning();
+    }
+  }
+}
+
 void SystemTask::PushMessage(System::Messages msg) {
   if (in_isr()) {
     BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    xQueueSendFromISR(systemTasksMsgQueue, &msg, &xHigherPriorityTaskWoken);
+    if (xQueueSendFromISR(systemTasksMsgQueue, &msg, &xHigherPriorityTaskWoken) != pdTRUE) {
+      // Queue full — coalesce touch so wake/gestures are not lost forever.
+      if (msg == Messages::OnTouchEvent) {
+        pendingTouchEvent = true;
+      }
+    }
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
   } else {
     xQueueSend(systemTasksMsgQueue, &msg, portMAX_DELAY);

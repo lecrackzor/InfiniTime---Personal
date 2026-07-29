@@ -11,6 +11,7 @@ void Settings::Init() {
 
   // Load default settings from Flash
   LoadSettingsFromFile();
+  RepairDfuAndFsModeConsistency();
 }
 
 void Settings::SaveSettings() {

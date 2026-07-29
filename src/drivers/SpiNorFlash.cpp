@@ -76,7 +76,11 @@ void SpiNorFlash::Read(uint32_t address, uint8_t* buffer, size_t size) {
                           static_cast<uint8_t>(address >> 16U),
                           static_cast<uint8_t>(address >> 8U),
                           static_cast<uint8_t>(address)};
-  spi.Read(reinterpret_cast<uint8_t*>(&cmd), cmdSize, buffer, size);
+  lastReadOk = spi.Read(reinterpret_cast<uint8_t*>(&cmd), cmdSize, buffer, size);
+}
+
+bool SpiNorFlash::ReadFailed() const {
+  return !lastReadOk;
 }
 
 void SpiNorFlash::WriteEnable() {

@@ -139,10 +139,13 @@ namespace Pinetime {
 
       void HandleButtonAction(Controllers::ButtonActions action);
       bool fastWakeUpDone = false;
+      // Coalesce touch IRQs when the system queue is full (ISR cannot block).
+      volatile bool pendingTouchEvent = false;
 
       void GoToRunning();
       void GoToSleep();
       void UpdateMotion();
+      void HandleTouchEvent();
       static constexpr TickType_t batteryMeasurementPeriod = pdMS_TO_TICKS(10 * 60 * 1000);
 
       // Last power-present state we acted on (GPIO can re-fire after MeasureVoltage refreshed the cache).

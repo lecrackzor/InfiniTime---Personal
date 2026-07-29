@@ -153,8 +153,12 @@ void AlarmController::LoadSettingsFromFile() {
     return;
   }
 
-  fs.FileRead(&alarmFile, reinterpret_cast<uint8_t*>(&alarmBuffer), sizeof(alarmBuffer));
+  const auto read = fs.FileRead(&alarmFile, reinterpret_cast<uint8_t*>(&alarmBuffer), sizeof(alarmBuffer));
   fs.FileClose(&alarmFile);
+  if (read != static_cast<int>(sizeof(alarmBuffer))) {
+    NRF_LOG_WARNING("[AlarmController] Truncated alarm data file, discarding");
+    return;
+  }
   if (alarmBuffer.version != alarmFormatVersion) {
     NRF_LOG_WARNING("[AlarmController] Loaded alarm settings has version %u instead of %u, discarding",
                     alarmBuffer.version,
@@ -174,12 +178,16 @@ void AlarmController::SaveSettingsToFile() const {
     fs.DirCreate("/.system");
   }
   lfs_file_t alarmFile;
-  if (fs.FileOpen(&alarmFile, "/.system/alarm.dat", LFS_O_WRONLY | LFS_O_CREAT) != LFS_ERR_OK) {
+  if (fs.FileOpen(&alarmFile, "/.system/alarm.dat", LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) != LFS_ERR_OK) {
     NRF_LOG_WARNING("[AlarmController] Failed to open alarm data file for saving");
     return;
   }
 
-  fs.FileWrite(&alarmFile, reinterpret_cast<const uint8_t*>(&alarm), sizeof(alarm));
+  const auto written = fs.FileWrite(&alarmFile, reinterpret_cast<const uint8_t*>(&alarm), sizeof(alarm));
   fs.FileClose(&alarmFile);
+  if (written != static_cast<int>(sizeof(alarm))) {
+    NRF_LOG_WARNING("[AlarmController] Failed to write full alarm settings");
+    return;
+  }
   NRF_LOG_INFO("[AlarmController] Saved alarm settings with format version %u to file", alarm.version);
 }

@@ -154,5 +154,5 @@ int FS::SectorRead(const struct lfs_config* c, lfs_block_t block, lfs_off_t off,
   Pinetime::Controllers::FS& lfs = *(static_cast<Pinetime::Controllers::FS*>(c->context));
   const size_t address = startAddress + (block * blockSize) + off;
   lfs.flashDriver.Read(address, static_cast<uint8_t*>(buffer), size);
-  return 0;
+  return lfs.flashDriver.ReadFailed() ? -1 : 0;
 }
