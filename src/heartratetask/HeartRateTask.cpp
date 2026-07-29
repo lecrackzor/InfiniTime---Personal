@@ -295,21 +295,56 @@ void HeartRateTask::HandleSensorData() {
       if (bpm.has_value()) {
         valueCurrentlyShown = true;
         controller.UpdateState(ControllerStates::Ready);
-        // BLE policy is independent of screen on/off. Companion charts must not starve
-        // just because the watch face is awake (foreground used to be change-only only).
-        // First lock of each StartMeasurement session always notifies (covers timed BG
-        // and the first FG/Cont sample). After that: change-only + ~30s stale floor in
-        // HeartRateController (avoids Cont ~20 Hz flood while locked).
-        if (!backgroundBleSent) {
-          controller.NotifyHeartRateToService(bpm.value());
-          backgroundBleSent = true;
+
+        auto period = BackgroundMeasurementInterval();
+        const bool continuous = period.has_value() && period.value() == 0;
+        const bool timed = period.has_value() && period.value() > 0;
+
+        if (continuous) {
+          // Cont: first lock always-notifies; then change-only + ~30s stale floor.
+          if (!backgroundBleSent) {
+            controller.NotifyHeartRateToService(bpm.value());
+            backgroundBleSent = true;
+          } else {
+            controller.UpdateHeartRate(bpm.value());
+          }
+        } else if (timed) {
+          // 1/3/5m (and 30s): one GB point per schedule window — not a Cont stream.
+          // Background wakes are already gated by BackgroundMeasurementNeeded — always
+          // allow that one notify. Do not gate BG on lastTimedBleTick: success sets
+          // lastMeasurementTime to session start, so start+period arrives ~8s before
+          // notifyTime+period and would silently skip every other interval.
+          // Foreground (screen on) still rate-limits with lastTimedBleTick so wrist
+          // raises do not spam GB between scheduled points.
+          if (!backgroundBleSent) {
+            const TickType_t now = xTaskGetTickCount();
+            const bool due = (state == States::BackgroundMeasuring) || !timedBleEverSent ||
+                             (now - lastTimedBleTick) >= period.value();
+            if (due) {
+              controller.NotifyHeartRateToService(bpm.value());
+              timedBleEverSent = true;
+              lastTimedBleTick = now;
+            } else {
+              controller.UpdateDisplayedHeartRate(bpm.value());
+            }
+            backgroundBleSent = true;
+          } else {
+            controller.UpdateDisplayedHeartRate(bpm.value());
+          }
         } else {
+          // Interval Off but measurement running (shouldn't normally happen).
           controller.UpdateHeartRate(bpm.value());
         }
       } else if (ppg.SufficientData()) {
-        // Keep last known BPM on the watch face and over BLE while re-acquiring.
+        // Keep last known BPM on the watch face while re-acquiring.
+        // Do not push 0 over BLE (poisons GB charts). Cont may re-arm always-notify
+        // on lost lock; timed must not — that would multi-fire inside one window.
         if (valueCurrentlyShown) {
           controller.UpdateState(ControllerStates::Searching);
+          auto period = BackgroundMeasurementInterval();
+          if (period.has_value() && period.value() == 0) {
+            backgroundBleSent = false;
+          }
         } else {
           SendHeartRate(ControllerStates::Searching, 0);
         }
@@ -318,6 +353,10 @@ void HeartRateTask::HandleSensorData() {
         // But still update the algorithm state
         if (valueCurrentlyShown) {
           controller.UpdateState(ControllerStates::NotEnoughData);
+          auto period = BackgroundMeasurementInterval();
+          if (period.has_value() && period.value() == 0) {
+            backgroundBleSent = false;
+          }
         } else {
           SendHeartRate(ControllerStates::NotEnoughData, 0);
         }

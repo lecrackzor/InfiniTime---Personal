@@ -29,7 +29,7 @@ namespace Pinetime {
 
         static constexpr std::array<Option, 7> options = {{
           {.intervalInSeconds = std::nullopt, .name = " Off"},
-          // Cont keeps the sensor on while sleeping; BLE is change-only + stale floor (not per-sample).
+          // Cont: continuous sensor + change-only BLE + 30s floor. Timed 1/3/5m: one GB point/window.
           {.intervalInSeconds = 0, .name = "Cont"},
           {.intervalInSeconds = 30, .name = " 30s"},
           {.intervalInSeconds = 60, .name = "  1m"},

@@ -23,6 +23,8 @@ namespace Pinetime {
       void Disable();
       void UpdateState(States newState);
       void UpdateHeartRate(uint8_t heartRate);
+      // Update the value shown on the watch face without notifying BLE.
+      void UpdateDisplayedHeartRate(uint8_t heartRate);
       // Notify BLE without changing the value shown on the watch face.
       void ReportHeartRateToService(uint8_t heartRate);
       // Update displayed BPM and always notify BLE (even if unchanged).
@@ -47,8 +49,7 @@ namespace Pinetime {
       States state = States::Disabled;
       uint8_t heartRate = 0;
       uint8_t lastReportedHeartRate = 0;
-      // Cont/foreground are change-only (~48 ms PPG). Without a floor, stable BPM
-      // can leave Gadgetbridge silent for many minutes while the watch still shows HR.
+      // Cont only: change-only (~48 ms PPG) needs a floor or stable BPM leaves GB silent.
       TickType_t lastBleNotifyTick = 0;
       Pinetime::Controllers::HeartRateService* service = nullptr;
     };

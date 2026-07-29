@@ -42,8 +42,11 @@ namespace Pinetime {
       QueueHandle_t messageQueue;
       bool valueCurrentlyShown;
       bool pausedByCharging = false;
-      // One always-notify per timed background session (not Cont). Guards ~48 ms PPG returns.
+      // One BLE attempt consumed for this StartMeasurement session.
       bool backgroundBleSent = false;
+      // Timed 1/3/5m: last successful GB point (rate-limit screen-wake duplicates).
+      bool timedBleEverSent = false;
+      TickType_t lastTimedBleTick = 0;
       States state = States::Disabled;
       uint16_t count;
       uint16_t lastHrs = 0;

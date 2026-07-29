@@ -7,8 +7,7 @@
 using namespace Pinetime::Controllers;
 
 namespace {
-  // Max silence while locked Cont/foreground measuring. Far below Cont's ~20 Hz
-  // flood; enough that GB charts stay alive during stable resting HR.
+  // Cont only. Timed 1/3/5m sends one point per schedule window — not this floor.
   constexpr TickType_t maxBleSilentTicks = pdMS_TO_TICKS(30000);
 }
 
@@ -34,6 +33,10 @@ void HeartRateController::NotifyServiceIfChanged(uint8_t heartRate) {
 void HeartRateController::UpdateHeartRate(uint8_t heartRate) {
   this->heartRate = heartRate;
   NotifyServiceIfChanged(heartRate);
+}
+
+void HeartRateController::UpdateDisplayedHeartRate(uint8_t heartRate) {
+  this->heartRate = heartRate;
 }
 
 void HeartRateController::ReportHeartRateToService(uint8_t heartRate) {
