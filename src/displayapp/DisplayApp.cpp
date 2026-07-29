@@ -328,9 +328,9 @@ void DisplayApp::Refresh() {
         if (currentApp == Apps::Launcher || currentApp == Apps::Notifications || currentApp == Apps::QuickSettings ||
             currentApp == Apps::Settings) {
           LoadScreen(Apps::Clock, DisplayApp::FullRefreshDirections::None);
-          // Wait for the clock app to load before moving on.
-          while (!lv_task_handler()) {
-          };
+          // Drain immediate LVGL work before sleep (cap iterations to avoid busy-loop).
+          for (int i = 0; i < 50 && lv_task_handler() == 0; ++i) {
+          }
         }
         // Clear any ongoing touch pressed events
         // Without this LVGL gets stuck in the pressed state and will keep refreshing the

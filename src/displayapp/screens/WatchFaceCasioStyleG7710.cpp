@@ -285,11 +285,7 @@ void WatchFaceCasioStyleG7710::ApplyTheme() {
   lv_obj_set_style_local_text_color(stepIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorSteps);
 
   lv_obj_set_style_local_text_color(heartbeatValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorHeart);
-  if (heartbeatRunning.Get()) {
-    lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorHeart);
-  } else {
-    lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorHeartIdle);
-  }
+  lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorHeartIdle);
 
   lv_style_set_line_color(&style_line, LV_STATE_DEFAULT, ColorLines);
   lv_style_set_line_color(&style_border, LV_STATE_DEFAULT, ColorLines);
@@ -372,7 +368,11 @@ void WatchFaceCasioStyleG7710::Refresh() {
   bleState = bleController.IsConnected();
   bleRadioEnabled = bleController.IsRadioEnabled();
   if (bleState.IsUpdated() || bleRadioEnabled.IsUpdated()) {
-    lv_label_set_text_static(bleIcon, BleIcon::GetIcon(bleState.Get()));
+    if (bleRadioEnabled.Get()) {
+      lv_label_set_text_static(bleIcon, BleIcon::GetIcon(bleState.Get()));
+    } else {
+      lv_label_set_text_static(bleIcon, BleIcon::GetIcon(false));
+    }
     statusBarDirty = true;
   }
 
@@ -463,23 +463,20 @@ void WatchFaceCasioStyleG7710::Refresh() {
 
   heartbeat = heartRateController.HeartRate();
   heartbeatRunning = heartRateController.State() != Controllers::HeartRateController::States::Disabled;
-  if (heartbeat.IsUpdated() || heartbeatRunning.IsUpdated()) {
-    if (heartbeatRunning.Get()) {
-      lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorHeart);
-      // Hold last known BPM between samples; stay blank until the first trusted reading.
-      if (heartbeat.Get() > 0) {
-        lv_label_set_text_fmt(heartbeatValue, "%d", heartbeat.Get());
-      } else {
-        lv_label_set_text_static(heartbeatValue, "");
-      }
+  // Always refresh HR UI — state can leave Ready without changing the BPM value (Searching/Stopped).
+  if (heartbeatRunning.Get()) {
+    lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorHeart);
+    if (heartRateController.State() == Controllers::HeartRateController::States::Ready && heartbeat.Get() > 0) {
+      lv_label_set_text_fmt(heartbeatValue, "%d", heartbeat.Get());
     } else {
-      lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorHeartIdle);
       lv_label_set_text_static(heartbeatValue, "");
     }
-
-    lv_obj_realign(heartbeatIcon);
-    lv_obj_realign(heartbeatValue);
+  } else {
+    lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, ColorHeartIdle);
+    lv_label_set_text_static(heartbeatValue, "");
   }
+  lv_obj_realign(heartbeatIcon);
+  lv_obj_realign(heartbeatValue);
 
   stepCount = motionController.NbSteps();
   if (stepCount.IsUpdated()) {

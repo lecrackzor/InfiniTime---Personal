@@ -122,14 +122,16 @@ void WatchFaceTerminal::Refresh() {
 
   powerPresent = batteryController.IsPowerPresent();
   batteryPercentRemaining = batteryController.PercentRemaining();
-  if (batteryPercentRemaining.IsUpdated() || powerPresent.IsUpdated()) {
+  isCharging = batteryController.IsCharging();
+  if (batteryPercentRemaining.IsUpdated() || powerPresent.IsUpdated() || isCharging.IsUpdated()) {
     lv_obj_set_style_local_text_color(batteryValue,
                                       LV_LABEL_PART_MAIN,
                                       LV_STATE_DEFAULT,
                                       BatteryIcon::ColorFromPercentage(batteryPercentRemaining.Get()));
-    lv_label_set_text_fmt(batteryValue, "#ffffff [BATT]# %d%%", batteryPercentRemaining.Get());
-    if (batteryController.IsCharging()) {
-      lv_label_ins_text(batteryValue, LV_LABEL_POS_LAST, " Charging");
+    if (isCharging.Get()) {
+      lv_label_set_text_fmt(batteryValue, "#ffffff [BATT]# %d%% Charging", batteryPercentRemaining.Get());
+    } else {
+      lv_label_set_text_fmt(batteryValue, "#ffffff [BATT]# %d%%", batteryPercentRemaining.Get());
     }
   }
 
@@ -140,18 +142,17 @@ void WatchFaceTerminal::Refresh() {
 
   heartbeat = heartRateController.HeartRate();
   heartbeatRunning = heartRateController.State() != Controllers::HeartRateController::States::Disabled;
-  if (heartbeat.IsUpdated() || heartbeatRunning.IsUpdated()) {
-    if (heartbeatRunning.Get()) {
-      lv_obj_set_style_local_text_color(heartbeatValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, Colors::deepOrange);
-      if (heartRateController.State() == Controllers::HeartRateController::States::Ready && heartbeat.Get() > 0) {
-        lv_label_set_text_fmt(heartbeatValue, "#ffffff [L_HR]# %d bpm", heartbeat.Get());
-      } else {
-        lv_label_set_text_static(heartbeatValue, "#ffffff [L_HR]# ---");
-      }
+  // Always refresh — Ready→Searching keeps the same BPM value but must show ---.
+  if (heartbeatRunning.Get()) {
+    lv_obj_set_style_local_text_color(heartbeatValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, Colors::deepOrange);
+    if (heartRateController.State() == Controllers::HeartRateController::States::Ready && heartbeat.Get() > 0) {
+      lv_label_set_text_fmt(heartbeatValue, "#ffffff [L_HR]# %d bpm", heartbeat.Get());
     } else {
       lv_label_set_text_static(heartbeatValue, "#ffffff [L_HR]# ---");
-      lv_obj_set_style_local_text_color(heartbeatValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, Colors::gray);
     }
+  } else {
+    lv_label_set_text_static(heartbeatValue, "#ffffff [L_HR]# ---");
+    lv_obj_set_style_local_text_color(heartbeatValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, Colors::gray);
   }
 
   currentWeather = weatherService.Current();

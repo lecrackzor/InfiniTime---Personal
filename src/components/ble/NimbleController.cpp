@@ -492,25 +492,43 @@ void NimbleController::PersistBond(struct ble_gap_conn_desc& desc) {
      */
     systemTask.PushMessage(Pinetime::System::Messages::DisableSleeping);
 
-    // This isn't quite correct
-    // SystemTask could receive EnableSleeping right after passing this check
-    // We need some guarantee that the SystemTask has processed the above message
-    // before we can continue
-    while (!systemTask.IsSleepDisabled()) {
+    // Wait briefly for SystemTask to process DisableSleeping before FS access.
+    TickType_t waited = 0;
+    constexpr TickType_t maxWait = pdMS_TO_TICKS(2000);
+    while (!systemTask.IsSleepDisabled() && waited < maxWait) {
       vTaskDelay(pdMS_TO_TICKS(5));
+      waited += pdMS_TO_TICKS(5);
+    }
+    if (!systemTask.IsSleepDisabled()) {
+      NRF_LOG_INFO("PersistBond aborted: sleep still enabled");
+      systemTask.PushMessage(Pinetime::System::Messages::EnableSleeping);
+      return;
     }
 
     lfs_file_t file_p;
 
-    rc = fs.FileOpen(&file_p, "/bond.dat", LFS_O_WRONLY | LFS_O_CREAT);
+    rc = fs.FileOpen(&file_p, "/bond.dat", LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC);
     if (rc == 0) {
-      fs.FileWrite(&file_p, reinterpret_cast<uint8_t*>(&our_sec.sec), sizeof our_sec);
-      fs.FileWrite(&file_p, reinterpret_cast<uint8_t*>(&peer_sec.sec), sizeof peer_sec);
-      fs.FileWrite(&file_p, reinterpret_cast<const uint8_t*>(&peer_count), 1);
-      for (int i = 0; i < peer_count; i++) {
-        fs.FileWrite(&file_p, reinterpret_cast<uint8_t*>(&peer_cccd_set[i].cccd), sizeof(struct ble_store_value_cccd));
+      bool ok = true;
+      if (fs.FileWrite(&file_p, reinterpret_cast<uint8_t*>(&our_sec.sec), sizeof our_sec) != static_cast<int>(sizeof our_sec)) {
+        ok = false;
+      }
+      if (ok && fs.FileWrite(&file_p, reinterpret_cast<uint8_t*>(&peer_sec.sec), sizeof peer_sec) != static_cast<int>(sizeof peer_sec)) {
+        ok = false;
+      }
+      if (ok && fs.FileWrite(&file_p, reinterpret_cast<const uint8_t*>(&peer_count), 1) != 1) {
+        ok = false;
+      }
+      for (int i = 0; ok && i < peer_count; i++) {
+        if (fs.FileWrite(&file_p, reinterpret_cast<uint8_t*>(&peer_cccd_set[i].cccd), sizeof(struct ble_store_value_cccd)) !=
+            static_cast<int>(sizeof(struct ble_store_value_cccd))) {
+          ok = false;
+        }
       }
       fs.FileClose(&file_p);
+      if (!ok) {
+        fs.FileDelete("/bond.dat");
+      }
     }
     systemTask.PushMessage(Pinetime::System::Messages::EnableSleeping);
   }
@@ -522,21 +540,44 @@ void NimbleController::RestoreBond() {
   uint8_t peer_count = 0;
 
   if (fs.FileOpen(&file_p, "/bond.dat", LFS_O_RDONLY) == 0) {
+    bool ok = true;
     memset(&sec, 0, sizeof sec);
-    fs.FileRead(&file_p, reinterpret_cast<uint8_t*>(&sec.sec), sizeof sec);
-    ble_store_write_our_sec(&sec.sec);
+    if (fs.FileRead(&file_p, reinterpret_cast<uint8_t*>(&sec.sec), sizeof sec) != static_cast<int>(sizeof sec)) {
+      ok = false;
+    } else {
+      ble_store_write_our_sec(&sec.sec);
+    }
 
-    memset(&sec, 0, sizeof sec);
-    fs.FileRead(&file_p, reinterpret_cast<uint8_t*>(&sec.sec), sizeof sec);
-    ble_store_write_peer_sec(&sec.sec);
+    if (ok) {
+      memset(&sec, 0, sizeof sec);
+      if (fs.FileRead(&file_p, reinterpret_cast<uint8_t*>(&sec.sec), sizeof sec) != static_cast<int>(sizeof sec)) {
+        ok = false;
+      } else {
+        ble_store_write_peer_sec(&sec.sec);
+      }
+    }
 
-    fs.FileRead(&file_p, &peer_count, 1);
-    for (int i = 0; i < peer_count; i++) {
-      fs.FileRead(&file_p, reinterpret_cast<uint8_t*>(&cccd.cccd), sizeof(struct ble_store_value_cccd));
-      ble_store_write_cccd(&cccd.cccd);
+    if (ok && fs.FileRead(&file_p, &peer_count, 1) != 1) {
+      ok = false;
+    }
+    if (ok) {
+      if (peer_count > MYNEWT_VAL(BLE_STORE_MAX_CCCDS)) {
+        peer_count = MYNEWT_VAL(BLE_STORE_MAX_CCCDS);
+      }
+      for (int i = 0; ok && i < peer_count; i++) {
+        if (fs.FileRead(&file_p, reinterpret_cast<uint8_t*>(&cccd.cccd), sizeof(struct ble_store_value_cccd)) !=
+            static_cast<int>(sizeof(struct ble_store_value_cccd))) {
+          ok = false;
+          break;
+        }
+        ble_store_write_cccd(&cccd.cccd);
+      }
     }
 
     fs.FileClose(&file_p);
     fs.FileDelete("/bond.dat");
+    if (!ok) {
+      NRF_LOG_INFO("RestoreBond: truncated/corrupt bond.dat discarded");
+    }
   }
 }

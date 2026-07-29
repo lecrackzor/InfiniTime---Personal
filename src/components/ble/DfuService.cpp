@@ -6,6 +6,7 @@
 #include "drivers/SpiNorFlash.h"
 #include "systemtask/SystemTask.h"
 #include <nrf_log.h>
+#include <host/ble_att.h>
 
 using namespace Pinetime::Controllers;
 
@@ -133,11 +134,27 @@ int DfuService::SendDfuRevision(os_mbuf* om) const {
 }
 
 int DfuService::WritePacketHandler(uint16_t connectionHandle, os_mbuf* om) {
+  if (om == nullptr || om->om_data == nullptr) {
+    return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+  }
+  // Reject fragmented ATT writes — handlers below assume contiguous om_data.
+  if (om->om_len < OS_MBUF_PKTLEN(om)) {
+    return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+  }
   switch (state) {
     case States::Start: {
+      if (om->om_len < 12) {
+        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+      }
       softdeviceSize = om->om_data[0] + (om->om_data[1] << 8) + (om->om_data[2] << 16) + (om->om_data[3] << 24);
       bootloaderSize = om->om_data[4] + (om->om_data[5] << 8) + (om->om_data[6] << 16) + (om->om_data[7] << 24);
       applicationSize = om->om_data[8] + (om->om_data[9] << 8) + (om->om_data[10] << 16) + (om->om_data[11] << 24);
+      // Cap to update-slot size so a malicious Start cannot write past the image region.
+      if (applicationSize == 0 || applicationSize > dfuImage.MaxSize()) {
+        NRF_LOG_INFO("[DFU] -> Rejected Start: app size %d (max %d)", applicationSize, dfuImage.MaxSize());
+        applicationSize = 0;
+        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+      }
       bleController.FirmwareUpdateTotalBytes(applicationSize);
       NRF_LOG_INFO("[DFU] -> Start data received : SD size : %d, BT size : %d, app size : %d",
                    softdeviceSize,
@@ -157,11 +174,23 @@ int DfuService::WritePacketHandler(uint16_t connectionHandle, os_mbuf* om) {
     }
       return 0;
     case States::Init: {
+      // Init packet layout: 8 + 2 (sd count) + 2*sdCount + 2 (CRC). Cap sdCount to avoid VLA stack blowup.
+      constexpr uint16_t maxSoftDevices = 16;
+      if (om->om_len < 12) {
+        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+      }
       uint16_t deviceType = om->om_data[0] + (om->om_data[1] << 8);
       uint16_t deviceRevision = om->om_data[2] + (om->om_data[3] << 8);
       uint32_t applicationVersion = om->om_data[4] + (om->om_data[5] << 8) + (om->om_data[6] << 16) + (om->om_data[7] << 24);
       uint16_t softdeviceArrayLength = om->om_data[8] + (om->om_data[9] << 8);
-      uint16_t sd[softdeviceArrayLength];
+      if (softdeviceArrayLength > maxSoftDevices) {
+        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+      }
+      const uint16_t need = static_cast<uint16_t>(10 + (softdeviceArrayLength * 2) + 2);
+      if (om->om_len < need) {
+        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+      }
+      uint16_t sd[maxSoftDevices] = {};
       for (int i = 0; i < softdeviceArrayLength; i++) {
         sd[i] = om->om_data[10 + (i * 2)] + (om->om_data[10 + (i * 2) + 1] << 8);
       }
@@ -173,19 +202,23 @@ int DfuService::WritePacketHandler(uint16_t connectionHandle, os_mbuf* om) {
         deviceRevision,
         applicationVersion,
         softdeviceArrayLength,
-        sd[0],
+        softdeviceArrayLength > 0 ? sd[0] : 0,
         expectedCrc);
 
       return 0;
     }
 
     case States::Data: {
+      // Image Init() only accepts 20-byte Nordic DFU chunks.
+      if (om->om_len == 0 || om->om_len > 20) {
+        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+      }
       nbPacketReceived++;
       dfuImage.Append(om->om_data, om->om_len);
       bytesReceived += om->om_len;
       bleController.FirmwareUpdateCurrentBytes(bytesReceived);
 
-      if ((nbPacketReceived % nbPacketsToNotify) == 0 && bytesReceived != applicationSize) {
+      if (nbPacketsToNotify > 0 && (nbPacketReceived % nbPacketsToNotify) == 0 && bytesReceived != applicationSize) {
         uint8_t data[5] {static_cast<uint8_t>(Opcodes::PacketReceiptNotification),
                          static_cast<uint8_t>(bytesReceived & 0x000000FFu),
                          static_cast<uint8_t>(bytesReceived >> 8u),
@@ -212,11 +245,17 @@ int DfuService::WritePacketHandler(uint16_t connectionHandle, os_mbuf* om) {
 }
 
 int DfuService::ControlPointHandler(uint16_t connectionHandle, os_mbuf* om) {
+  if (om == nullptr || om->om_data == nullptr || om->om_len < 1) {
+    return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+  }
   auto opcode = static_cast<Opcodes>(om->om_data[0]);
   NRF_LOG_INFO("[DFU] -> ControlPointHandler");
 
   switch (opcode) {
     case Opcodes::StartDFU: {
+      if (om->om_len < 2) {
+        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+      }
       if (state != States::Idle && state != States::Start) {
         NRF_LOG_INFO("[DFU] -> Start DFU requested, but we are not in Idle state");
         return 0;
@@ -246,6 +285,9 @@ int DfuService::ControlPointHandler(uint16_t connectionHandle, os_mbuf* om) {
       }
     } break;
     case Opcodes::InitDFUParameters: {
+      if (om->om_len < 2) {
+        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+      }
       if (state != States::Init) {
         NRF_LOG_INFO("[DFU] -> Init DFU requested, but we are not in Init state");
         return 0;
@@ -263,6 +305,9 @@ int DfuService::ControlPointHandler(uint16_t connectionHandle, os_mbuf* om) {
     }
       return 0;
     case Opcodes::PacketReceiptNotificationRequest:
+      if (om->om_len < 2) {
+        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+      }
       nbPacketsToNotify = om->om_data[1];
       NRF_LOG_INFO("[DFU] -> Receive Packet Notification Request, nb packet = %d", nbPacketsToNotify);
       return 0;
@@ -270,6 +315,10 @@ int DfuService::ControlPointHandler(uint16_t connectionHandle, os_mbuf* om) {
       if (state != States::Init) {
         NRF_LOG_INFO("[DFU] -> Receive firmware image requested, but we are not in Start Init");
         return 0;
+      }
+      if (applicationSize == 0 || applicationSize > dfuImage.MaxSize()) {
+        NRF_LOG_INFO("[DFU] -> Receive firmware rejected: invalid app size %d", applicationSize);
+        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
       }
       // Stock Gadgetbridge Nordic DFU uses legacy 20-byte packets (disableMtuRequest).
       dfuImage.Init(20, applicationSize, expectedCrc);
@@ -426,7 +475,8 @@ void DfuService::NotificationManager::Reset() {
 }
 
 void DfuService::DfuImage::Init(size_t chunkSize, size_t totalSize, uint16_t expectedCrc) {
-  if (chunkSize != 20) {
+  if (chunkSize != 20 || totalSize == 0 || totalSize > maxSize) {
+    ready = false;
     return;
   }
   this->chunkSize = chunkSize;

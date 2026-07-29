@@ -213,7 +213,9 @@ void SystemTask::Work() {
     if (xQueueReceive(systemTasksMsgQueue, &msg, waitTime) == pdTRUE) {
       switch (msg) {
         case Messages::EnableSleeping:
-          wakeLocksHeld--;
+          if (wakeLocksHeld > 0) {
+            wakeLocksHeld--;
+          }
           break;
         case Messages::DisableSleeping:
           GoToRunning();
@@ -259,7 +261,9 @@ void SystemTask::Work() {
           if (bleController.State() == Pinetime::Controllers::Ble::FirmwareUpdateStates::Validated) {
             NVIC_SystemReset();
           }
-          wakeLocksHeld--;
+          if (wakeLocksHeld > 0) {
+            wakeLocksHeld--;
+          }
           break;
         case Messages::StartFileTransfer:
           NRF_LOG_INFO("[systemtask] FS Started");
@@ -269,7 +273,9 @@ void SystemTask::Work() {
           break;
         case Messages::StopFileTransfer:
           NRF_LOG_INFO("[systemtask] FS Stopped");
-          wakeLocksHeld--;
+          if (wakeLocksHeld > 0) {
+            wakeLocksHeld--;
+          }
           // TODO add intent of fs access icon or something
           break;
         case Messages::OnTouchEvent:

@@ -51,7 +51,11 @@ void StatusIcons::Update() {
   bleState = bleController.IsConnected();
   bleRadioEnabled = bleController.IsRadioEnabled();
   if (bleState.IsUpdated() || bleRadioEnabled.IsUpdated()) {
-    lv_obj_set_hidden(bleIcon, !bleState.Get());
+    if (!bleRadioEnabled.Get()) {
+      lv_obj_set_hidden(bleIcon, true);
+    } else {
+      lv_obj_set_hidden(bleIcon, !bleState.Get());
+    }
   }
 
   lv_obj_realign(container);

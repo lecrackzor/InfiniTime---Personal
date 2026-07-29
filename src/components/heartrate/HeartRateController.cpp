@@ -46,6 +46,7 @@ void HeartRateController::Enable() {
 void HeartRateController::Disable() {
   if (task != nullptr) {
     state = States::Disabled;
+    lastReportedHeartRate = 0;
     task->PushMessage(Pinetime::Applications::HeartRateTask::Messages::Disable);
   }
 }

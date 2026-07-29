@@ -63,6 +63,9 @@ namespace Pinetime {
         void Append(uint8_t* data, size_t size);
         bool Validate();
         bool IsComplete();
+        [[nodiscard]] size_t MaxSize() const {
+          return maxSize;
+        }
 
       private:
         Pinetime::Drivers::SpiNorFlash& spiNorFlash;
@@ -70,7 +73,7 @@ namespace Pinetime {
         bool ready = false;
         size_t chunkSize = 0;
         size_t totalSize = 0;
-        size_t maxSize = 475136;
+        static constexpr size_t maxSize = 475136;
         size_t bufferWriteIndex = 0;
         size_t totalWriteIndex = 0;
         static constexpr size_t writeOffset = 0x40000;

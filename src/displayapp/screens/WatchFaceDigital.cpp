@@ -124,6 +124,7 @@ void WatchFaceDigital::Refresh() {
       lv_obj_align(label_time, lv_scr_act(), LV_ALIGN_IN_RIGHT_MID, 0, 0);
     } else {
       lv_label_set_text_fmt(label_time, "%02d:%02d", hour, minute);
+      lv_label_set_text_static(label_time_ampm, "");
       lv_obj_align(label_time, lv_scr_act(), LV_ALIGN_CENTER, 0, 0);
     }
 
@@ -152,22 +153,21 @@ void WatchFaceDigital::Refresh() {
 
   heartbeat = heartRateController.HeartRate();
   heartbeatRunning = heartRateController.State() != Controllers::HeartRateController::States::Disabled;
-  if (heartbeat.IsUpdated() || heartbeatRunning.IsUpdated()) {
-    if (heartbeatRunning.Get()) {
-      lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, lv_color_hex(0xCE1B1B));
-      if (heartRateController.State() == Controllers::HeartRateController::States::Ready && heartbeat.Get() > 0) {
-        lv_label_set_text_fmt(heartbeatValue, "%d", heartbeat.Get());
-      } else {
-        lv_label_set_text_static(heartbeatValue, "");
-      }
+  // Always refresh — Ready→Searching keeps the same BPM value but must clear the face.
+  if (heartbeatRunning.Get()) {
+    lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, lv_color_hex(0xCE1B1B));
+    if (heartRateController.State() == Controllers::HeartRateController::States::Ready && heartbeat.Get() > 0) {
+      lv_label_set_text_fmt(heartbeatValue, "%d", heartbeat.Get());
     } else {
-      lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, lv_color_hex(0x1B1B1B));
       lv_label_set_text_static(heartbeatValue, "");
     }
-
-    lv_obj_realign(heartbeatIcon);
-    lv_obj_realign(heartbeatValue);
+  } else {
+    lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, lv_color_hex(0x1B1B1B));
+    lv_label_set_text_static(heartbeatValue, "");
   }
+
+  lv_obj_realign(heartbeatIcon);
+  lv_obj_realign(heartbeatValue);
 
   stepCount = motionController.NbSteps();
   if (stepCount.IsUpdated()) {

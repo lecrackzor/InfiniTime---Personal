@@ -40,26 +40,30 @@ Notifications::Notifications(DisplayApp* app,
     validDisplay = false;
   }
   if (mode == Modes::Preview) {
-    wakeLock.Lock();
-    if (notification.category == Controllers::NotificationManager::Categories::IncomingCall) {
-      motorController.StartRinging();
-    } else if (notification.category == Controllers::NotificationManager::Categories::HighProriotyAlert) {
-      motorController.RunForDuration(70);
-    } else if (notification.category == Controllers::NotificationManager::Categories::MissedCall) {
-      motorController.RunForDuration(50);
+    if (!validDisplay) {
+      running = false;
     } else {
-      motorController.RunForDuration(35);
+      wakeLock.Lock();
+      if (notification.category == Controllers::NotificationManager::Categories::IncomingCall) {
+        motorController.StartRinging();
+      } else if (notification.category == Controllers::NotificationManager::Categories::HighProriotyAlert) {
+        motorController.RunForDuration(70);
+      } else if (notification.category == Controllers::NotificationManager::Categories::MissedCall) {
+        motorController.RunForDuration(50);
+      } else {
+        motorController.RunForDuration(35);
+      }
+
+      timeoutLine = lv_line_create(lv_scr_act(), nullptr);
+
+      lv_obj_set_style_local_line_width(timeoutLine, LV_LINE_PART_MAIN, LV_STATE_DEFAULT, 3);
+      lv_obj_set_style_local_line_color(timeoutLine, LV_LINE_PART_MAIN, LV_STATE_DEFAULT, LV_COLOR_WHITE);
+      lv_obj_set_style_local_line_rounded(timeoutLine, LV_LINE_PART_MAIN, LV_STATE_DEFAULT, true);
+
+      lv_line_set_points(timeoutLine, timeoutLinePoints, 2);
+      timeoutTickCountStart = xTaskGetTickCount();
+      interacted = false;
     }
-
-    timeoutLine = lv_line_create(lv_scr_act(), nullptr);
-
-    lv_obj_set_style_local_line_width(timeoutLine, LV_LINE_PART_MAIN, LV_STATE_DEFAULT, 3);
-    lv_obj_set_style_local_line_color(timeoutLine, LV_LINE_PART_MAIN, LV_STATE_DEFAULT, LV_COLOR_WHITE);
-    lv_obj_set_style_local_line_rounded(timeoutLine, LV_LINE_PART_MAIN, LV_STATE_DEFAULT, true);
-
-    lv_line_set_points(timeoutLine, timeoutLinePoints, 2);
-    timeoutTickCountStart = xTaskGetTickCount();
-    interacted = false;
   }
 
   taskRefresh = lv_task_create(RefreshTaskCallback, LV_DISP_DEF_REFR_PERIOD, LV_TASK_PRIO_MID, this);
@@ -77,6 +81,7 @@ void Notifications::Refresh() {
     TickType_t tick = xTaskGetTickCount();
     int32_t pos = LV_HOR_RES - ((tick - timeoutTickCountStart) / (timeoutLength / LV_HOR_RES));
     if (pos <= 0) {
+      OnPreviewInteraction();
       running = false;
     } else {
       timeoutLinePoints[1].x = pos;
@@ -107,9 +112,11 @@ void Notifications::Refresh() {
 
     if (validDisplay) {
       Controllers::NotificationManager::Notification::Idx currentIdx = notificationManager.IndexOf(currentId);
+      const uint8_t notifNr =
+        (currentIdx < notificationManager.NbNotifications()) ? static_cast<uint8_t>(currentIdx + 1) : 1;
       currentItem = std::make_unique<NotificationItem>(notification.Title(),
                                                        notification.Message(),
-                                                       currentIdx + 1,
+                                                       notifNr,
                                                        notification.category,
                                                        notificationManager.NbNotifications(),
                                                        alertNotificationService,
@@ -119,7 +126,11 @@ void Notifications::Refresh() {
     }
   }
 
-  running = running && currentItem->IsRunning();
+  if (currentItem != nullptr) {
+    running = running && currentItem->IsRunning();
+  } else {
+    running = false;
+  }
 }
 
 void Notifications::OnPreviewInteraction() {
@@ -197,12 +208,14 @@ bool Notifications::OnTouchEvent(Pinetime::Applications::TouchEvents event) {
 
       currentId = previousNotification.id;
       Controllers::NotificationManager::Notification::Idx currentIdx = notificationManager.IndexOf(currentId);
+      const uint8_t notifNr =
+        (currentIdx < notificationManager.NbNotifications()) ? static_cast<uint8_t>(currentIdx + 1) : 1;
       validDisplay = true;
       currentItem.reset(nullptr);
       app->SetFullRefresh(DisplayApp::FullRefreshDirections::Down);
       currentItem = std::make_unique<NotificationItem>(previousNotification.Title(),
                                                        previousNotification.Message(),
-                                                       currentIdx + 1,
+                                                       notifNr,
                                                        previousNotification.category,
                                                        notificationManager.NbNotifications(),
                                                        alertNotificationService,
@@ -224,12 +237,14 @@ bool Notifications::OnTouchEvent(Pinetime::Applications::TouchEvents event) {
 
       currentId = nextNotification.id;
       Controllers::NotificationManager::Notification::Idx currentIdx = notificationManager.IndexOf(currentId);
+      const uint8_t notifNr =
+        (currentIdx < notificationManager.NbNotifications()) ? static_cast<uint8_t>(currentIdx + 1) : 1;
       validDisplay = true;
       currentItem.reset(nullptr);
       app->SetFullRefresh(DisplayApp::FullRefreshDirections::Up);
       currentItem = std::make_unique<NotificationItem>(nextNotification.Title(),
                                                        nextNotification.Message(),
-                                                       currentIdx + 1,
+                                                       notifNr,
                                                        nextNotification.category,
                                                        notificationManager.NbNotifications(),
                                                        alertNotificationService,
@@ -434,5 +449,8 @@ void Notifications::NotificationItem::OnCallButtonEvent(lv_obj_t* obj, lv_event_
 }
 
 Notifications::NotificationItem::~NotificationItem() {
-  lv_obj_clean(lv_scr_act());
+  if (container != nullptr) {
+    lv_obj_del(container);
+    container = nullptr;
+  }
 }

@@ -40,6 +40,7 @@ namespace Pinetime {
       private:
         Utility::DirtyValue<int> batteryPercentRemaining {};
         Utility::DirtyValue<bool> powerPresent {};
+        Utility::DirtyValue<bool> isCharging {};
         Utility::DirtyValue<bool> bleState {};
         Utility::DirtyValue<bool> bleRadioEnabled {};
         Utility::DirtyValue<std::chrono::time_point<std::chrono::system_clock, std::chrono::seconds>> currentDateTime {};

@@ -178,6 +178,13 @@ int FSService::OnFSServiceRequested(uint16_t connectionHandle, uint16_t attribut
 }
 
 int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
+  if (om == nullptr || om->om_data == nullptr || om->om_len < 1) {
+    return 0;
+  }
+  // Reject fragmented ATT writes — all paths below assume a contiguous header+payload.
+  if (om->om_len < OS_MBUF_PKTLEN(om)) {
+    return 0;
+  }
   auto command = static_cast<commands>(om->om_data[0]);
   NRF_LOG_INFO("[FS_S] -> FSCommandHandler Command %d", command);
   // Just always make sure we are awake...
@@ -192,9 +199,13 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
   switch (command) {
     case commands::READ: {
       NRF_LOG_INFO("[FS_S] -> Read");
+      if (om->om_len < sizeof(ReadHeader)) {
+        systemTask.PushMessage(Pinetime::System::Messages::StopFileTransfer);
+        return 0;
+      }
       auto* header = (ReadHeader*) om->om_data;
       uint16_t plen = header->pathlen;
-      if (plen > maxpathlen) {
+      if (plen > maxpathlen || om->om_len < sizeof(ReadHeader) + plen) {
         ReadResponse resp {};
         resp.command = commands::READ_DATA;
         resp.status = static_cast<uint8_t>(LFS_ERR_NAMETOOLONG);
@@ -225,12 +236,17 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
         resp.chunklen = std::min({header->chunksize, remaining, maxChunk});
         resp.totallen = info.size;
         FS::Lock lock(fs);
-        fs.FileOpen(&f, filepath, LFS_O_RDONLY);
-        fs.FileSeek(&f, header->chunkoff);
-        resp.chunklen = fs.FileRead(&f, fileData, resp.chunklen);
-        respOm = ble_hs_mbuf_from_flat(&resp, sizeof(ReadResponse));
-        os_mbuf_append(respOm, fileData, resp.chunklen);
-        fs.FileClose(&f);
+        if (fs.FileOpen(&f, filepath, LFS_O_RDONLY) != 0) {
+          resp.chunklen = 0;
+          resp.status = static_cast<uint8_t>(LFS_ERR_IO);
+          respOm = ble_hs_mbuf_from_flat(&resp, sizeof(ReadResponse));
+        } else {
+          fs.FileSeek(&f, header->chunkoff);
+          resp.chunklen = fs.FileRead(&f, fileData, resp.chunklen);
+          respOm = ble_hs_mbuf_from_flat(&resp, sizeof(ReadResponse));
+          os_mbuf_append(respOm, fileData, resp.chunklen);
+          fs.FileClose(&f);
+        }
       }
 
       ble_gattc_notify_custom(connectionHandle, transferCharacteristicHandle, respOm);
@@ -238,6 +254,10 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
     }
     case commands::READ_PACING: {
       NRF_LOG_INFO("[FS_S] -> Readpacing");
+      if (om->om_len < sizeof(ReadPacing)) {
+        systemTask.PushMessage(Pinetime::System::Messages::StopFileTransfer);
+        return 0;
+      }
       auto* header = (ReadHeader*) om->om_data;
       ReadResponse resp;
       resp.command = commands::READ_DATA;
@@ -279,13 +299,17 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
     }
     case commands::WRITE: {
       NRF_LOG_INFO("[FS_S] -> Write");
+      if (om->om_len < sizeof(WriteHeader)) {
+        systemTask.PushMessage(Pinetime::System::Messages::StopFileTransfer);
+        return 0;
+      }
       auto* header = (WriteHeader*) om->om_data;
       uint16_t plen = header->pathlen;
       WriteResponse resp {};
       resp.command = commands::WRITE_PACING;
       resp.offset = header->offset;
       resp.modTime = 0;
-      if (plen > maxpathlen) {
+      if (plen > maxpathlen || om->om_len < sizeof(WriteHeader) + plen) {
         resp.status = static_cast<uint8_t>(LFS_ERR_NAMETOOLONG);
         resp.freespace = 0;
         auto* respOm = ble_hs_mbuf_from_flat(&resp, sizeof(WriteResponse));
@@ -297,7 +321,8 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
       filepath[plen] = 0;
       fileSize = header->totalSize;
 
-      int res = fs.FileOpen(&f, filepath, LFS_O_RDWR | LFS_O_CREAT);
+      // Truncate so a shorter rewrite cannot leave a stale tail.
+      int res = fs.FileOpen(&f, filepath, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC);
       if (res == 0) {
         fs.FileClose(&f);
         resp.status = 0x01;
@@ -311,10 +336,21 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
     }
     case commands::WRITE_DATA: {
       NRF_LOG_INFO("[FS_S] -> WriteData");
+      if (om->om_len < sizeof(WritePacing)) {
+        systemTask.PushMessage(Pinetime::System::Messages::StopFileTransfer);
+        return 0;
+      }
       auto* header = (WritePacing*) om->om_data;
       WriteResponse resp {};
       resp.command = commands::WRITE_PACING;
       resp.offset = header->offset;
+      if (om->om_len < sizeof(WritePacing) + header->dataSize) {
+        resp.status = static_cast<uint8_t>(LFS_ERR_IO);
+        resp.freespace = 0;
+        auto* respOm = ble_hs_mbuf_from_flat(&resp, sizeof(WriteResponse));
+        ble_gattc_notify_custom(connectionHandle, transferCharacteristicHandle, respOm);
+        break;
+      }
       int res = 0;
       {
         FS::Lock lock(fs);
@@ -337,11 +373,21 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
     }
     case commands::DELETE: {
       NRF_LOG_INFO("[FS_S] -> Delete");
+      if (om->om_len < sizeof(DelHeader)) {
+        systemTask.PushMessage(Pinetime::System::Messages::StopFileTransfer);
+        return 0;
+      }
       auto* header = (DelHeader*) om->om_data;
       uint16_t plen = header->pathlen;
       char path[maxpathlen] = {0};
-      if (plen >= maxpathlen) {
-        plen = maxpathlen - 1;
+      if (plen >= maxpathlen || om->om_len < sizeof(DelHeader) + plen) {
+        DelResponse bad {};
+        bad.command = commands::DELETE_STATUS;
+        bad.status = static_cast<uint8_t>(LFS_ERR_NAMETOOLONG);
+        auto* respOm = ble_hs_mbuf_from_flat(&bad, sizeof(DelResponse));
+        ble_gattc_notify_custom(connectionHandle, transferCharacteristicHandle, respOm);
+        systemTask.PushMessage(Pinetime::System::Messages::StopFileTransfer);
+        return 0;
       }
       memcpy(path, header->pathstr, plen);
       path[plen] = 0;
@@ -355,11 +401,22 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
     }
     case commands::MKDIR: {
       NRF_LOG_INFO("[FS_S] -> MKDir");
+      if (om->om_len < sizeof(MKDirHeader)) {
+        systemTask.PushMessage(Pinetime::System::Messages::StopFileTransfer);
+        return 0;
+      }
       auto* header = (MKDirHeader*) om->om_data;
       uint16_t plen = header->pathlen;
       char path[maxpathlen] = {0};
-      if (plen >= maxpathlen) {
-        plen = maxpathlen - 1;
+      if (plen >= maxpathlen || om->om_len < sizeof(MKDirHeader) + plen) {
+        MKDirResponse bad {};
+        bad.command = commands::MKDIR_STATUS;
+        bad.status = static_cast<uint8_t>(LFS_ERR_NAMETOOLONG);
+        bad.modification_time = 0;
+        auto* respOm = ble_hs_mbuf_from_flat(&bad, sizeof(MKDirResponse));
+        ble_gattc_notify_custom(connectionHandle, transferCharacteristicHandle, respOm);
+        systemTask.PushMessage(Pinetime::System::Messages::StopFileTransfer);
+        return 0;
       }
       memcpy(path, header->pathstr, plen);
       path[plen] = 0;
@@ -376,11 +433,21 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
       NRF_LOG_INFO("[FS_S] -> ListDir");
       FinishListDir();
 
+      if (om->om_len < sizeof(ListDirHeader)) {
+        systemTask.PushMessage(Pinetime::System::Messages::StopFileTransfer);
+        return 0;
+      }
       ListDirHeader* header = (ListDirHeader*) om->om_data;
       uint16_t plen = header->pathlen;
       char path[maxpathlen] = {0};
-      if (plen >= maxpathlen) {
-        plen = maxpathlen - 1;
+      if (plen >= maxpathlen || om->om_len < sizeof(ListDirHeader) + plen) {
+        ListDirResponse bad {};
+        bad.command = commands::LISTDIR_ENTRY;
+        bad.status = static_cast<uint8_t>(LFS_ERR_NAMETOOLONG);
+        auto* respOm = ble_hs_mbuf_from_flat(&bad, sizeof(ListDirResponse));
+        ble_gattc_notify_custom(connectionHandle, transferCharacteristicHandle, respOm);
+        systemTask.PushMessage(Pinetime::System::Messages::StopFileTransfer);
+        return 0;
       }
       memcpy(path, header->pathstr, plen);
       path[plen] = 0;
@@ -414,22 +481,36 @@ int FSService::FSCommandHandler(uint16_t connectionHandle, os_mbuf* om) {
     }
     case commands::MOVE: {
       NRF_LOG_INFO("[FS_S] -> Move");
+      if (om->om_len < sizeof(MoveHeader)) {
+        systemTask.PushMessage(Pinetime::System::Messages::StopFileTransfer);
+        return 0;
+      }
       MoveHeader* header = (MoveHeader*) om->om_data;
       uint16_t plen = header->OldPathLength;
-      header->pathstr[plen] = 0;
-      char path[maxpathlen] = {0};
       uint16_t newLen = header->NewPathLength;
-      if (newLen >= maxpathlen) {
-        newLen = maxpathlen - 1;
+      // Payload: old path, NUL, new path (matches historical InfiniTime MOVE layout).
+      const uint16_t need = static_cast<uint16_t>(sizeof(MoveHeader) + plen + 1 + newLen);
+      if (plen >= maxpathlen || newLen >= maxpathlen || om->om_len < need) {
+        MoveResponse resp {};
+        resp.command = commands::MOVE_STATUS;
+        resp.status = static_cast<int8_t>(LFS_ERR_NAMETOOLONG);
+        auto* respOm = ble_hs_mbuf_from_flat(&resp, sizeof(MoveResponse));
+        ble_gattc_notify_custom(connectionHandle, transferCharacteristicHandle, respOm);
+        break;
       }
-      memcpy(path, &header->pathstr[plen + 1], newLen);
-      path[newLen] = 0;
+      char oldPath[maxpathlen] = {0};
+      char newPath[maxpathlen] = {0};
+      memcpy(oldPath, header->pathstr, plen);
+      oldPath[plen] = 0;
+      memcpy(newPath, &header->pathstr[plen + 1], newLen);
+      newPath[newLen] = 0;
       MoveResponse resp {};
       resp.command = commands::MOVE_STATUS;
-      int8_t res = (int8_t) fs.Rename(header->pathstr, path);
+      int8_t res = (int8_t) fs.Rename(oldPath, newPath);
       resp.status = (res == 0) ? 1 : res;
       auto* respOm = ble_hs_mbuf_from_flat(&resp, sizeof(MoveResponse));
       ble_gattc_notify_custom(connectionHandle, transferCharacteristicHandle, respOm);
+      break;
     }
     default:
       break;

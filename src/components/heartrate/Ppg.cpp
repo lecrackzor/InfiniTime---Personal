@@ -277,14 +277,20 @@ void Ppg::RunAlg() {
     outputs[index - segmentNormWindow + 1] = std::sqrt(rollSum / segmentNormWindow) * 2;
   }
   size_t halfNorm = segmentNormWindow / 2;
+  constexpr float minRms = 1e-6f;
   for (size_t index = 0; index < inputLength; index++) {
+    float denom;
     if (index <= halfNorm) {
-      fftArray[index] /= outputs[0];
+      denom = outputs[0];
     } else if (index >= inputLength - halfNorm) {
-      fftArray[index] /= outputs[outputs.size() - 1];
+      denom = outputs[outputs.size() - 1];
     } else {
-      fftArray[index] /= outputs[index - halfNorm];
+      denom = outputs[index - halfNorm];
     }
+    if (denom < minRms) {
+      denom = minRms;
+    }
+    fftArray[index] /= denom;
   }
 }
 
@@ -317,6 +323,9 @@ void Ppg::HarmonicFilter() {
 
   for (size_t frequencyBin = minFrequencyBin; frequencyBin < maxFrequencyBin; frequencyBin++) {
     float f0Mag = std::abs(complexFftArray[frequencyBin]);
+    if (f0Mag < 1e-12f) {
+      continue;
+    }
     float f1Mag = (0.5f * std::abs(complexFftArray[(frequencyBin * 2) - 1])) + std::abs(complexFftArray[frequencyBin * 2]) +
                   (0.5f * std::abs(complexFftArray[(frequencyBin * 2) + 1]));
     float f2Mag = std::abs(complexFftArray[(frequencyBin * 3) - 1]) + std::abs(complexFftArray[frequencyBin * 3]) +

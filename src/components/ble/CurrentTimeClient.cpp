@@ -1,6 +1,7 @@
 #include "components/ble/CurrentTimeClient.h"
 #include <nrf_log.h>
 #include "components/datetime/DateTimeController.h"
+#include <host/ble_att.h>
 
 using namespace Pinetime::Controllers;
 
@@ -59,6 +60,12 @@ bool CurrentTimeClient::OnDiscoveryEvent(uint16_t connectionHandle, const ble_ga
 int CurrentTimeClient::OnCharacteristicDiscoveryEvent(uint16_t conn_handle,
                                                       const ble_gatt_error* error,
                                                       const ble_gatt_chr* characteristic) {
+  if (error->status != 0 && error->status != BLE_HS_EDONE) {
+    NRF_LOG_INFO("CTS Characteristic discovery error: %d", error->status);
+    onServiceDiscovered(conn_handle);
+    return 0;
+  }
+
   if (characteristic == nullptr && error->status == BLE_HS_EDONE) {
     if (isCharacteristicDiscovered) {
       NRF_LOG_INFO("CTS Characteristic discovery complete, fetching time");
@@ -81,6 +88,11 @@ int CurrentTimeClient::OnCharacteristicDiscoveryEvent(uint16_t conn_handle,
 
 int CurrentTimeClient::OnCurrentTimeReadResult(uint16_t conn_handle, const ble_gatt_error* error, const ble_gatt_attr* attribute) {
   if (error->status == 0) {
+    if (attribute == nullptr || attribute->om == nullptr || OS_MBUF_PKTLEN(attribute->om) < sizeof(CtsData)) {
+      NRF_LOG_INFO("CTS read too short");
+      onServiceDiscovered(conn_handle);
+      return 0;
+    }
     CtsData result;
     os_mbuf_copydata(attribute->om, 0, sizeof(CtsData), &result);
     uint16_t year = ((uint16_t) result.year_MSO << 8) + result.year_LSO;

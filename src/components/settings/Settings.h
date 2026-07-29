@@ -428,7 +428,7 @@ namespace Pinetime {
       bool dfuAndFsEnabledTillReboot = false;
 
       void LoadSettingsFromFile();
-      void SaveSettingsToFile();
+      [[nodiscard]] bool SaveSettingsToFile();
     };
   }
 }

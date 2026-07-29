@@ -197,11 +197,9 @@ void WatchFacePrideFlag::Refresh() {
   powerPresent = batteryController.IsPowerPresent();
   bleState = bleController.IsConnected();
   batteryPercentRemaining = batteryController.PercentRemaining();
-  if (batteryPercentRemaining.IsUpdated() || powerPresent.IsUpdated() || themeChanged) {
-    lv_label_set_text_fmt(batteryValue, "%d%%", batteryPercentRemaining.Get());
-    if (batteryController.IsPowerPresent()) {
-      lv_label_ins_text(batteryValue, LV_LABEL_POS_LAST, " Charging");
-    }
+  isCharging = batteryController.IsCharging();
+  if (batteryPercentRemaining.IsUpdated() || powerPresent.IsUpdated() || isCharging.IsUpdated() || themeChanged) {
+    lv_label_set_text_fmt(batteryValue, "%d%%%s", batteryPercentRemaining.Get(), isCharging.Get() ? " Charging" : "");
   }
   if (bleState.IsUpdated()) {
     if (bleState.Get()) {

@@ -2,6 +2,7 @@
 #include <cstring>
 #include "components/ble/NotificationManager.h"
 #include "systemtask/SystemTask.h"
+#include <host/ble_att.h>
 
 using namespace Pinetime::Controllers;
 
@@ -59,6 +60,9 @@ void ImmediateAlertService::Init() {
 int ImmediateAlertService::OnAlertLevelChanged(uint16_t attributeHandle, ble_gatt_access_ctxt* context) {
   if (attributeHandle == alertLevelHandle) {
     if (context->op == BLE_GATT_ACCESS_OP_WRITE_CHR) {
+      if (context->om == nullptr || OS_MBUF_PKTLEN(context->om) < 1) {
+        return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+      }
       auto alertLevel = static_cast<Levels>(context->om->om_data[0]);
       auto* alertString = ToString(alertLevel);
 
