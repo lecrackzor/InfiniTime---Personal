@@ -29,6 +29,7 @@ void HeartRateController::ReportHeartRateToService(uint8_t heartRate) {
 }
 
 void HeartRateController::NotifyHeartRateToService(uint8_t heartRate) {
+  this->heartRate = heartRate;
   lastReportedHeartRate = heartRate;
   if (service != nullptr) {
     service->OnNewHeartRateValue(heartRate);

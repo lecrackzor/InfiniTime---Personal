@@ -24,7 +24,7 @@ namespace Pinetime {
       void UpdateHeartRate(uint8_t heartRate);
       // Notify BLE without changing the value shown on the watch face.
       void ReportHeartRateToService(uint8_t heartRate);
-      // Always notify BLE (even if BPM unchanged) — used for background samples / subscribe seed.
+      // Update displayed BPM and always notify BLE (even if unchanged).
       void NotifyHeartRateToService(uint8_t heartRate);
 
       void SetHeartRateTask(Applications::HeartRateTask* task);

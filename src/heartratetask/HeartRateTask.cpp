@@ -291,22 +291,16 @@ void HeartRateTask::HandleSensorData() {
 
       bpm = ppg.HeartRate();
       if (bpm.has_value()) {
-        if (state == States::BackgroundMeasuring) {
-          // Always notify on a successful background sample so stable BPM still
-          // produces one GB point per interval (change-only would skip repeats).
-          valueCurrentlyShown = true;
-          controller.UpdateState(ControllerStates::Ready);
-          controller.UpdateHeartRate(bpm.value());
-          controller.NotifyHeartRateToService(bpm.value());
-        } else {
-          SendHeartRate(ControllerStates::Ready, bpm.value());
-        }
+        // Always notify on every successful sample (fg + bg). Change-only BLE made
+        // Gadgetbridge charts look broken/spotty when BPM was stable.
+        valueCurrentlyShown = true;
+        controller.UpdateState(ControllerStates::Ready);
+        controller.NotifyHeartRateToService(bpm.value());
       } else if (ppg.SufficientData()) {
-        // Keep last known BPM on the watch face while re-acquiring, but report 0 over BLE
-        // so Gadgetbridge recording matches pre-hold behaviour.
+        // Keep last known BPM on the watch face and over BLE while re-acquiring.
+        // Pushing 0 here punched holes in Gadgetbridge's HR line.
         if (valueCurrentlyShown) {
           controller.UpdateState(ControllerStates::Searching);
-          controller.ReportHeartRateToService(0);
         } else {
           SendHeartRate(ControllerStates::Searching, 0);
         }
