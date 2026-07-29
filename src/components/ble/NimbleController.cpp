@@ -471,11 +471,20 @@ void NimbleController::PersistBond(struct ble_gap_conn_desc& desc) {
   if (rc == 0) {
     memset(&key, 0, sizeof key);
     key.cccd.peer_addr = desc.peer_id_addr;
+    int store_count = 0;
+    ble_store_util_count(BLE_STORE_OBJ_TYPE_CCCD, &store_count);
     int peer_count = 0;
-    ble_store_util_count(BLE_STORE_OBJ_TYPE_CCCD, &peer_count);
-    for (int i = 0; i < peer_count; i++) {
+    for (int i = 0; i < store_count && peer_count < MYNEWT_VAL(BLE_STORE_MAX_CCCDS); i++) {
       key.cccd.idx = i;
-      ble_store_read_cccd(&key.cccd, &peer_cccd_set[i].cccd);
+      union ble_store_value entry {};
+      if (ble_store_read_cccd(&key.cccd, &entry.cccd) != 0) {
+        break;
+      }
+      // Only persist CCCDs that belong to this peer (global store idx can include others).
+      if (ble_addr_cmp(&entry.cccd.peer_addr, &desc.peer_id_addr) != 0) {
+        continue;
+      }
+      peer_cccd_set[peer_count++] = entry;
     }
 
     /* Wakeup Spi and SpiNorFlash before accessing the file system

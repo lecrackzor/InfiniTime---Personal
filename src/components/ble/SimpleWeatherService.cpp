@@ -126,11 +126,24 @@ void SimpleWeatherService::Init() {
 
 int SimpleWeatherService::OnCommand(struct ble_gatt_access_ctxt* ctxt) {
   const auto* buffer = ctxt->om;
+  if (buffer == nullptr || buffer->om_data == nullptr) {
+    return 0;
+  }
+
+  // Require a single contiguous mbuf covering the full packet (rejects short / fragmented writes).
+  const uint16_t packetLen = OS_MBUF_PKTLEN(buffer);
+  if (packetLen < 2 || buffer->om_len < packetLen) {
+    return 0;
+  }
+
   const auto* dataBuffer = buffer->om_data;
+  const uint8_t version = GetVersion(dataBuffer);
 
   switch (GetMessageType(dataBuffer)) {
-    case MessageType::CurrentWeather:
-      if (GetVersion(dataBuffer) <= 1) {
+    case MessageType::CurrentWeather: {
+      // v0 ends at icon (byte 48) → 49 bytes; v1 adds sunrise/sunset → 53 bytes.
+      const uint16_t minLen = (version >= 1) ? 53 : 49;
+      if (version <= 1 && packetLen >= minLen) {
         currentWeather = CreateCurrentWeather(dataBuffer);
         NRF_LOG_INFO("Current weather :\n\tTimestamp : %d\n\tTemperature:%d\n\tMin:%d\n\tMax:%d\n\tIcon:%d\n\tLocation:%s",
                      currentWeather->timestamp,
@@ -139,28 +152,35 @@ int SimpleWeatherService::OnCommand(struct ble_gatt_access_ctxt* ctxt) {
                      currentWeather->maxTemperature.PreciseCelsius(),
                      currentWeather->iconId,
                      currentWeather->location.data());
-        if (GetVersion(dataBuffer) == 1) {
+        if (version == 1) {
           NRF_LOG_INFO("Sunrise: %d\n\tSunset: %d", currentWeather->sunrise, currentWeather->sunset);
         }
       }
       break;
-    case MessageType::Forecast:
-      if (GetVersion(dataBuffer) == 0) {
-        forecast = CreateForecast(dataBuffer);
-        NRF_LOG_INFO("Forecast : Timestamp : %d", forecast->timestamp);
-        const uint8_t daysToLog = std::min(forecast->nbDays, SimpleWeatherService::MaxNbForecastDays);
-        for (int i = 0; i < daysToLog; i++) {
-          if (!forecast->days[i].has_value()) {
-            continue;
+    }
+    case MessageType::Forecast: {
+      if (version == 0 && packetLen >= 11) {
+        const uint8_t nbDaysInBuffer = dataBuffer[10];
+        const uint8_t nbDays = std::min(SimpleWeatherService::MaxNbForecastDays, nbDaysInBuffer);
+        const uint16_t need = static_cast<uint16_t>(11 + (nbDays * 5));
+        if (packetLen >= need) {
+          forecast = CreateForecast(dataBuffer);
+          NRF_LOG_INFO("Forecast : Timestamp : %d", forecast->timestamp);
+          const uint8_t daysToLog = std::min(forecast->nbDays, SimpleWeatherService::MaxNbForecastDays);
+          for (int i = 0; i < daysToLog; i++) {
+            if (!forecast->days[i].has_value()) {
+              continue;
+            }
+            NRF_LOG_INFO("\t[%d] Min: %d - Max : %d - Icon : %d",
+                         i,
+                         forecast->days[i]->minTemperature.PreciseCelsius(),
+                         forecast->days[i]->maxTemperature.PreciseCelsius(),
+                         forecast->days[i]->iconId);
           }
-          NRF_LOG_INFO("\t[%d] Min: %d - Max : %d - Icon : %d",
-                       i,
-                       forecast->days[i]->minTemperature.PreciseCelsius(),
-                       forecast->days[i]->maxTemperature.PreciseCelsius(),
-                       forecast->days[i]->iconId);
         }
       }
       break;
+    }
     default:
       break;
   }

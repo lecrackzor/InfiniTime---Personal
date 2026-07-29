@@ -303,6 +303,7 @@ void HeartRateTask::HandleSensorData() {
           if (continuousBackground) {
             controller.UpdateHeartRate(bpm.value());
           } else if (!backgroundBleSent) {
+            // Always notify once per timed interval so stable BPM still lands in GB.
             controller.NotifyHeartRateToService(bpm.value());
             backgroundBleSent = true;
           } else {

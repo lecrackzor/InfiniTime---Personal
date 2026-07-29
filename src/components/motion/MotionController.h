@@ -89,6 +89,11 @@ namespace Pinetime {
       TickType_t time = 0;
       TickType_t lastMotionNotifyTime = 0;
       TickType_t lastStepNotifyTime = 0;
+      bool stepsPendingNotify = false;
+      int16_t lastNotifiedX = 0;
+      int16_t lastNotifiedY = 0;
+      int16_t lastNotifiedZ = 0;
+      bool motionValuesSeeded = false;
 
       struct AccelStats {
         static constexpr uint8_t numHistory = 2;

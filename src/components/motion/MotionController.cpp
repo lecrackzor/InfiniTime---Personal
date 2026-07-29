@@ -48,21 +48,31 @@ void MotionController::Update(int16_t x, int16_t y, int16_t z, uint32_t nbSteps)
   // Offset the sensor value by whatever we are carrying forward
   nbSteps += carrySteps;
   uint32_t oldSteps = NbSteps(Days::Today);
-  if (oldSteps != nbSteps && service != nullptr) {
+  if (oldSteps != nbSteps) {
+    stepsPendingNotify = true;
+  }
+  if (stepsPendingNotify && service != nullptr) {
     // Coalesce step notifies to ~1 Hz — walking can change steps every 100 ms poll.
     TickType_t now = xTaskGetTickCount();
     if ((now - lastStepNotifyTime) >= pdMS_TO_TICKS(1000)) {
       lastStepNotifyTime = now;
+      stepsPendingNotify = false;
       service->OnNewStepCountValue(nbSteps);
     }
   }
 
   if (service != nullptr && (xHistory[0] != x || yHistory[0] != y || zHistory[0] != z)) {
-    // Throttle raw motion notifies (~1 Hz) — step count stays change-only above.
+    // Throttle raw motion notifies (~1 Hz) and skip identical triples.
     TickType_t now = xTaskGetTickCount();
     if ((now - lastMotionNotifyTime) >= pdMS_TO_TICKS(1000)) {
-      lastMotionNotifyTime = now;
-      service->OnNewMotionValues(x, y, z);
+      if (!motionValuesSeeded || lastNotifiedX != x || lastNotifiedY != y || lastNotifiedZ != z) {
+        lastMotionNotifyTime = now;
+        lastNotifiedX = x;
+        lastNotifiedY = y;
+        lastNotifiedZ = z;
+        motionValuesSeeded = true;
+        service->OnNewMotionValues(x, y, z);
+      }
     }
   }
 
