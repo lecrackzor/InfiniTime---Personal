@@ -244,6 +244,7 @@ void HeartRateTask::StartMeasurement() {
   ppg.Reset();
   lastHrs = 0;
   count = 0;
+  backgroundBleSent = false;
   measurementStartTime = xTaskGetTickCount();
 }
 
@@ -294,12 +295,21 @@ void HeartRateTask::HandleSensorData() {
         valueCurrentlyShown = true;
         controller.UpdateState(ControllerStates::Ready);
         if (state == States::BackgroundMeasuring) {
-          // One notify per background interval (session ends after first BPM).
-          // Always notify so a stable reading still lands in Gadgetbridge.
-          controller.NotifyHeartRateToService(bpm.value());
+          // Cont (interval 0): sensor stays on; Ppg::HeartRate() returns ~every 48 ms
+          // while locked — must be change-only or GB floods at ~20 Hz.
+          // Timed intervals (30s/3m/…): one always-notify per StartMeasurement session.
+          auto period = BackgroundMeasurementInterval();
+          const bool continuousBackground = period.has_value() && period.value() == 0;
+          if (continuousBackground) {
+            controller.UpdateHeartRate(bpm.value());
+          } else if (!backgroundBleSent) {
+            controller.NotifyHeartRateToService(bpm.value());
+            backgroundBleSent = true;
+          } else {
+            controller.UpdateHeartRate(bpm.value());
+          }
         } else {
-          // Foreground: HeartRate() returns every ~48 ms while locked — never
-          // always-notify here or GB gets ~20 Hz spam. Change-only is enough.
+          // Foreground: same ~48 ms return rate — change-only only.
           controller.UpdateHeartRate(bpm.value());
         }
       } else if (ppg.SufficientData()) {

@@ -75,8 +75,11 @@ void HeartRateService::OnNewHeartRateValue(uint8_t heartRateValue) {
 void HeartRateService::SubscribeNotification(uint16_t attributeHandle) {
   if (attributeHandle == heartRateMeasurementHandle) {
     heartRateMeasurementNotificationEnable = true;
-    // Seed GB with the current value so the first sample is not delayed until BPM changes.
-    heartRateController.NotifyHeartRateToService(heartRateController.HeartRate());
+    // Seed only a real BPM — never push 0 (looks like a valid "no pulse" sample in GB).
+    const uint8_t hr = heartRateController.HeartRate();
+    if (hr > 0) {
+      heartRateController.NotifyHeartRateToService(hr);
+    }
   }
 }
 

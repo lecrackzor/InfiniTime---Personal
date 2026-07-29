@@ -70,8 +70,13 @@ void FSService::OnDisconnect() {
   FinishListDir();
 }
 
-void FSService::OnNotifyTxComplete(uint16_t attributeHandle) {
+void FSService::OnNotifyTxComplete(uint16_t attributeHandle, int status) {
   if (!listDir.active || attributeHandle != transferCharacteristicHandle) {
+    return;
+  }
+  // Failed notify would otherwise leave LISTDIR active and the wake lock held forever.
+  if (status != 0) {
+    FinishListDir();
     return;
   }
   if (listDir.finishing) {
@@ -131,6 +136,16 @@ void FSService::SendListDirEntry(bool endOfList) {
   }
 
   resp.path_length = strlen(info.name);
+  // Truncate path so the notify fits the negotiated ATT MTU (oversized TX fails and stalled LISTDIR).
+  const uint16_t mtu = ble_att_mtu(listDir.connectionHandle);
+  const uint16_t headerBytes = static_cast<uint16_t>(sizeof(ListDirResponse));
+  uint16_t maxPath = 0;
+  if (mtu > attHeaderBytes + headerBytes) {
+    maxPath = static_cast<uint16_t>(mtu - attHeaderBytes - headerBytes);
+  }
+  if (resp.path_length > maxPath) {
+    resp.path_length = maxPath;
+  }
   auto* om = ble_hs_mbuf_from_flat(&resp, sizeof(ListDirResponse));
   os_mbuf_append(om, info.name, resp.path_length);
   ble_gattc_notify_custom(listDir.connectionHandle, transferCharacteristicHandle, om);

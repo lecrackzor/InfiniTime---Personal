@@ -24,7 +24,7 @@ namespace Pinetime {
 
       int OnFSServiceRequested(uint16_t connectionHandle, uint16_t attributeHandle, ble_gatt_access_ctxt* context);
       void NotifyFSRaw(uint16_t connectionHandle);
-      void OnNotifyTxComplete(uint16_t attributeHandle);
+      void OnNotifyTxComplete(uint16_t attributeHandle, int status);
       void OnDisconnect();
 
     private:

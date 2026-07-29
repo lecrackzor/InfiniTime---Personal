@@ -42,6 +42,8 @@ namespace Pinetime {
       QueueHandle_t messageQueue;
       bool valueCurrentlyShown;
       bool pausedByCharging = false;
+      // One always-notify per timed background session (not Cont). Guards ~48 ms PPG returns.
+      bool backgroundBleSent = false;
       States state = States::Disabled;
       uint16_t count;
       uint16_t lastHrs = 0;

@@ -123,7 +123,9 @@ int AlertNotificationClient::OnDescriptorDiscoveryEventCallback(uint16_t connect
                                                                 uint16_t characteristicValueHandle,
                                                                 const ble_gatt_dsc* descriptor) {
   if (error->status == 0) {
-    if (characteristicValueHandle == newAlertHandle && ble_uuid_cmp(&newAlertUuid.u, &descriptor->uuid.u)) {
+    // ble_uuid_cmp returns 0 on match — require Client Characteristic Configuration (0x2902).
+    static constexpr ble_uuid16_t cccdUuid {.u {.type = BLE_UUID_TYPE_16}, .value = BLE_GATT_DSC_CLT_CFG_UUID16};
+    if (characteristicValueHandle == newAlertHandle && ble_uuid_cmp(&cccdUuid.u, &descriptor->uuid.u) == 0) {
       if (newAlertDescriptorHandle == 0) {
         NRF_LOG_INFO("ANS Descriptor discovered : %d", descriptor->handle);
         newAlertDescriptorHandle = descriptor->handle;

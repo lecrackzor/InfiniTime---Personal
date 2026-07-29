@@ -22,7 +22,8 @@ namespace Pinetime {
       void NotifyBatteryLevel(uint16_t connectionHandle, uint8_t level);
       void SubscribeNotification(uint16_t attributeHandle);
       void UnsubscribeNotification(uint16_t attributeHandle);
-      void SeedNotification(uint16_t connectionHandle);
+      // attributeHandle must be the battery-level char — ignores other subscribe events.
+      void SeedNotification(uint16_t connectionHandle, uint16_t attributeHandle);
 
     private:
       Controllers::Battery& batteryController;

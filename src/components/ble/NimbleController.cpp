@@ -339,7 +339,8 @@ int NimbleController::OnGAPEvent(ble_gap_event* event) {
         heartRateService.SubscribeNotification(event->subscribe.attr_handle);
         motionService.SubscribeNotification(event->subscribe.attr_handle);
         batteryInformationService.SubscribeNotification(event->subscribe.attr_handle);
-        batteryInformationService.SeedNotification(event->subscribe.conn_handle);
+        // Seed only when this subscribe is the battery-level CCCD (not HR/motion).
+        batteryInformationService.SeedNotification(event->subscribe.conn_handle, event->subscribe.attr_handle);
       } else if (event->subscribe.prev_notify == 1 && event->subscribe.cur_notify == 0) {
         heartRateService.UnsubscribeNotification(event->subscribe.attr_handle);
         motionService.UnsubscribeNotification(event->subscribe.attr_handle);
@@ -388,9 +389,7 @@ int NimbleController::OnGAPEvent(ble_gap_event* event) {
 
     case BLE_GAP_EVENT_NOTIFY_TX:
       NRF_LOG_INFO("Notify event : BLE_GAP_EVENT_NOTIFY_TX");
-      if (event->notify_tx.status == 0) {
-        fsService.OnNotifyTxComplete(event->notify_tx.attr_handle);
-      }
+      fsService.OnNotifyTxComplete(event->notify_tx.attr_handle, event->notify_tx.status);
       break;
 
     case BLE_GAP_EVENT_IDENTITY_RESOLVED:

@@ -74,8 +74,8 @@ void BatteryInformationService::UnsubscribeNotification(uint16_t attributeHandle
   }
 }
 
-void BatteryInformationService::SeedNotification(uint16_t connectionHandle) {
-  if (!notificationEnabled) {
+void BatteryInformationService::SeedNotification(uint16_t connectionHandle, uint16_t attributeHandle) {
+  if (attributeHandle != batteryLevelHandle || !notificationEnabled) {
     return;
   }
   lastNotifiedLevel = 0xFF;

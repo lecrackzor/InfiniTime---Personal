@@ -245,8 +245,8 @@ void SystemTask::Work() {
         case Messages::BleConnected:
           displayApp.PushMessage(Pinetime::Applications::Display::Messages::NotifyDeviceActivity);
           isBleDiscoveryTimerRunning = true;
-          // Was 5s — start sooner after connect; CTS write-from-GB still works immediately.
-          bleDiscoveryTimer = 1;
+          // ~500 ms at 100 ms tick — leave headroom after connect before CTS/ANS discovery.
+          bleDiscoveryTimer = 5;
           break;
         case Messages::BleFirmwareUpdateStarted:
           // DfuService may already hold a prep wake lock (DisableSleeping) from first GATT access.

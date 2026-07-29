@@ -49,7 +49,12 @@ void MotionController::Update(int16_t x, int16_t y, int16_t z, uint32_t nbSteps)
   nbSteps += carrySteps;
   uint32_t oldSteps = NbSteps(Days::Today);
   if (oldSteps != nbSteps && service != nullptr) {
-    service->OnNewStepCountValue(nbSteps);
+    // Coalesce step notifies to ~1 Hz — walking can change steps every 100 ms poll.
+    TickType_t now = xTaskGetTickCount();
+    if ((now - lastStepNotifyTime) >= pdMS_TO_TICKS(1000)) {
+      lastStepNotifyTime = now;
+      service->OnNewStepCountValue(nbSteps);
+    }
   }
 
   if (service != nullptr && (xHistory[0] != x || yHistory[0] != y || zHistory[0] != z)) {
