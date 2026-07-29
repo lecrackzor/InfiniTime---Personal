@@ -81,7 +81,6 @@ int CurrentTimeClient::OnCharacteristicDiscoveryEvent(uint16_t conn_handle,
 
 int CurrentTimeClient::OnCurrentTimeReadResult(uint16_t conn_handle, const ble_gatt_error* error, const ble_gatt_attr* attribute) {
   if (error->status == 0) {
-    // TODO check that attribute->handle equals the handle discovered in OnCharacteristicDiscoveryEvent
     CtsData result;
     os_mbuf_copydata(attribute->om, 0, sizeof(CtsData), &result);
     uint16_t year = ((uint16_t) result.year_MSO << 8) + result.year_LSO;
@@ -90,6 +89,12 @@ int CurrentTimeClient::OnCurrentTimeReadResult(uint16_t conn_handle, const ble_g
     dateTimeController.SetTime(year, result.month, result.dayofmonth, result.hour, result.minute, result.second);
   } else {
     NRF_LOG_INFO("Error retrieving current time: %d", error->status);
+    if (!readRetried && currentTimeHandle != 0) {
+      readRetried = true;
+      NRF_LOG_INFO("Retrying CTS read");
+      ble_gattc_read(conn_handle, currentTimeHandle, CurrentTimeReadCallback, this);
+      return 0;
+    }
   }
 
   onServiceDiscovered(conn_handle);
@@ -99,6 +104,8 @@ int CurrentTimeClient::OnCurrentTimeReadResult(uint16_t conn_handle, const ble_g
 void CurrentTimeClient::Reset() {
   isDiscovered = false;
   isCharacteristicDiscovered = false;
+  readRetried = false;
+  currentTimeHandle = 0;
 }
 
 void CurrentTimeClient::Discover(uint16_t connectionHandle, std::function<void(uint16_t)> onServiceDiscovered) {

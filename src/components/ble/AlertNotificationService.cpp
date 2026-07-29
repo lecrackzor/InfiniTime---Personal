@@ -72,6 +72,31 @@ int AlertNotificationService::OnAlert(struct ble_gatt_access_ctxt* ctxt) {
       case Categories::Call:
         notif.category = Pinetime::Controllers::NotificationManager::Categories::IncomingCall;
         break;
+      case Categories::Email:
+        notif.category = Pinetime::Controllers::NotificationManager::Categories::Email;
+        break;
+      case Categories::News:
+        notif.category = Pinetime::Controllers::NotificationManager::Categories::News;
+        break;
+      case Categories::MissedCall:
+        notif.category = Pinetime::Controllers::NotificationManager::Categories::MissedCall;
+        break;
+      case Categories::MmsSms:
+        notif.category = Pinetime::Controllers::NotificationManager::Categories::Sms;
+        break;
+      case Categories::VoiceMail:
+        notif.category = Pinetime::Controllers::NotificationManager::Categories::VoiceMail;
+        break;
+      case Categories::Schedule:
+        notif.category = Pinetime::Controllers::NotificationManager::Categories::Schedule;
+        break;
+      case Categories::HighPrioritizedAlert:
+        notif.category = Pinetime::Controllers::NotificationManager::Categories::HighProriotyAlert;
+        break;
+      case Categories::InstantMessage:
+        notif.category = Pinetime::Controllers::NotificationManager::Categories::InstantMessage;
+        break;
+      case Categories::SimpleAlert:
       default:
         notif.category = Pinetime::Controllers::NotificationManager::Categories::SimpleAlert;
         break;

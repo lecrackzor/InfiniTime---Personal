@@ -24,6 +24,8 @@ namespace Pinetime {
 
       int OnFSServiceRequested(uint16_t connectionHandle, uint16_t attributeHandle, ble_gatt_access_ctxt* context);
       void NotifyFSRaw(uint16_t connectionHandle);
+      void OnNotifyTxComplete(uint16_t attributeHandle);
+      void OnDisconnect();
 
     private:
       Pinetime::System::SystemTask& systemTask;
@@ -37,6 +39,9 @@ namespace Pinetime {
       static constexpr uint16_t fsTransferId {0x0200};
       uint16_t fsVersion = {0x0004};
       static constexpr uint16_t maxpathlen = 256;
+      // Cap stack/temp buffers; further clamped by negotiated ATT MTU at runtime.
+      static constexpr uint16_t maxChunkPayload = 512;
+      static constexpr uint16_t attHeaderBytes = 3;
       static constexpr ble_uuid16_t fsServiceUuid {
         .u {.type = BLE_UUID_TYPE_16},
         .value = {0xFEBB}}; // {0x72, 0x65, 0x66, 0x73, 0x6e, 0x61, 0x72, 0x54, 0x65, 0x6c, 0x69, 0x46, 0xBB, 0xFE, 0xAF, 0xAD}};
@@ -79,6 +84,16 @@ namespace Pinetime {
       FSState state;
       char filepath[maxpathlen]; // TODO ..ugh fixed filepath len
       int fileSize;
+
+      struct ListDirSession {
+        bool active = false;
+        bool finishing = false;
+        uint16_t connectionHandle = BLE_HS_CONN_HANDLE_NONE;
+        lfs_dir_t dir {};
+        uint32_t entry = 0;
+        uint32_t totalentries = 0;
+      };
+      ListDirSession listDir;
 
       using ReadHeader = struct __attribute__((packed)) {
         commands command;
@@ -198,6 +213,9 @@ namespace Pinetime {
 
       int FSCommandHandler(uint16_t connectionHandle, os_mbuf* om);
       void prepareReadDataResp(ReadHeader* header, ReadResponse* resp);
+      [[nodiscard]] uint32_t MaxReadChunkBytes(uint16_t connectionHandle) const;
+      void SendListDirEntry(bool endOfList);
+      void FinishListDir();
     };
   }
 }

@@ -148,7 +148,11 @@ int SimpleWeatherService::OnCommand(struct ble_gatt_access_ctxt* ctxt) {
       if (GetVersion(dataBuffer) == 0) {
         forecast = CreateForecast(dataBuffer);
         NRF_LOG_INFO("Forecast : Timestamp : %d", forecast->timestamp);
-        for (int i = 0; i < 5; i++) {
+        const uint8_t daysToLog = std::min(forecast->nbDays, SimpleWeatherService::MaxNbForecastDays);
+        for (int i = 0; i < daysToLog; i++) {
+          if (!forecast->days[i].has_value()) {
+            continue;
+          }
           NRF_LOG_INFO("\t[%d] Min: %d - Max : %d - Icon : %d",
                        i,
                        forecast->days[i]->minTemperature.PreciseCelsius(),

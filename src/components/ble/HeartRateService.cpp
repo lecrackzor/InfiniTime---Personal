@@ -73,11 +73,15 @@ void HeartRateService::OnNewHeartRateValue(uint8_t heartRateValue) {
 }
 
 void HeartRateService::SubscribeNotification(uint16_t attributeHandle) {
-  if (attributeHandle == heartRateMeasurementHandle)
+  if (attributeHandle == heartRateMeasurementHandle) {
     heartRateMeasurementNotificationEnable = true;
+    // Seed GB with the current value so the first sample is not delayed until BPM changes.
+    heartRateController.NotifyHeartRateToService(heartRateController.HeartRate());
+  }
 }
 
 void HeartRateService::UnsubscribeNotification(uint16_t attributeHandle) {
-  if (attributeHandle == heartRateMeasurementHandle)
+  if (attributeHandle == heartRateMeasurementHandle) {
     heartRateMeasurementNotificationEnable = false;
+  }
 }

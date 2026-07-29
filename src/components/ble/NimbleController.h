@@ -72,6 +72,8 @@ namespace Pinetime {
       };
 
       uint16_t connHandle();
+      // Negotiated ATT MTU for the active connection (falls back to 23).
+      uint16_t AttMtu() const;
       void NotifyBatteryLevel(uint8_t level);
 
       void RestartFastAdv() {
@@ -86,6 +88,8 @@ namespace Pinetime {
       void RestoreBond();
 
       static constexpr const char* deviceName = "InfiniTime";
+      static constexpr uint16_t defaultAttMtu = 23;
+      static constexpr uint16_t preferredAttMtu = 247;
       Pinetime::System::SystemTask& systemTask;
       Ble& bleController;
       DateTime& dateTimeController;
@@ -110,6 +114,7 @@ namespace Pinetime {
 
       uint8_t addrType;
       uint16_t connectionHandle = BLE_HS_CONN_HANDLE_NONE;
+      uint16_t negotiatedMtu = defaultAttMtu;
       uint8_t fastAdvCount = 0;
       uint8_t bondId[16] = {0};
     };

@@ -49,6 +49,35 @@ int BatteryInformationService::OnBatteryServiceRequested(uint16_t attributeHandl
 }
 
 void BatteryInformationService::NotifyBatteryLevel(uint16_t connectionHandle, uint8_t level) {
+  if (!notificationEnabled) {
+    return;
+  }
+  if (level == lastNotifiedLevel) {
+    return;
+  }
+  lastNotifiedLevel = level;
   auto* om = ble_hs_mbuf_from_flat(&level, 1);
   ble_gattc_notify_custom(connectionHandle, batteryLevelHandle, om);
+}
+
+void BatteryInformationService::SubscribeNotification(uint16_t attributeHandle) {
+  if (attributeHandle != batteryLevelHandle) {
+    return;
+  }
+  notificationEnabled = true;
+  lastNotifiedLevel = 0xFF;
+}
+
+void BatteryInformationService::UnsubscribeNotification(uint16_t attributeHandle) {
+  if (attributeHandle == batteryLevelHandle) {
+    notificationEnabled = false;
+  }
+}
+
+void BatteryInformationService::SeedNotification(uint16_t connectionHandle) {
+  if (!notificationEnabled) {
+    return;
+  }
+  lastNotifiedLevel = 0xFF;
+  NotifyBatteryLevel(connectionHandle, batteryController.PercentRemaining());
 }

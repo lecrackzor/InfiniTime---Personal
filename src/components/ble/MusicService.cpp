@@ -152,23 +152,38 @@ int Pinetime::Controllers::MusicService::OnCommand(struct ble_gatt_access_ctxt* 
       if (playing) {
         trackProgressUpdateTime = xTaskGetTickCount();
       } else {
-        trackProgress +=
-          static_cast<int>((static_cast<float>(xTaskGetTickCount() - trackProgressUpdateTime) / 1024.0f) * getPlaybackSpeed());
+        trackProgress += static_cast<int>(
+          (static_cast<float>(xTaskGetTickCount() - trackProgressUpdateTime) / static_cast<float>(configTICK_RATE_HZ)) * getPlaybackSpeed());
       }
     } else if (ble_uuid_cmp(ctxt->chr->uuid, &msRepeatCharUuid.u) == 0) {
       repeat = s[0];
     } else if (ble_uuid_cmp(ctxt->chr->uuid, &msShuffleCharUuid.u) == 0) {
       shuffle = s[0];
     } else if (ble_uuid_cmp(ctxt->chr->uuid, &msPositionCharUuid.u) == 0) {
+      if (bufferSize < 4) {
+        return 0;
+      }
       trackProgress = (s[0] << 24) | (s[1] << 16) | (s[2] << 8) | s[3];
       trackProgressUpdateTime = xTaskGetTickCount();
     } else if (ble_uuid_cmp(ctxt->chr->uuid, &msTotalLengthCharUuid.u) == 0) {
+      if (bufferSize < 4) {
+        return 0;
+      }
       trackLength = (s[0] << 24) | (s[1] << 16) | (s[2] << 8) | s[3];
     } else if (ble_uuid_cmp(ctxt->chr->uuid, &msTrackNumberCharUuid.u) == 0) {
+      if (bufferSize < 4) {
+        return 0;
+      }
       trackNumber = (s[0] << 24) | (s[1] << 16) | (s[2] << 8) | s[3];
     } else if (ble_uuid_cmp(ctxt->chr->uuid, &msTrackTotalCharUuid.u) == 0) {
+      if (bufferSize < 4) {
+        return 0;
+      }
       tracksTotal = (s[0] << 24) | (s[1] << 16) | (s[2] << 8) | s[3];
     } else if (ble_uuid_cmp(ctxt->chr->uuid, &msPlaybackSpeedCharUuid.u) == 0) {
+      if (bufferSize < 4) {
+        return 0;
+      }
       playbackSpeed = static_cast<float>(((s[0] << 24) | (s[1] << 16) | (s[2] << 8) | s[3])) / 100.0f;
     }
   }
@@ -197,8 +212,9 @@ float Pinetime::Controllers::MusicService::getPlaybackSpeed() const {
 
 int Pinetime::Controllers::MusicService::getProgress() const {
   if (isPlaying()) {
-    return trackProgress +
-           static_cast<int>((static_cast<float>(xTaskGetTickCount() - trackProgressUpdateTime) / 1024.0f) * getPlaybackSpeed());
+    return trackProgress + static_cast<int>((static_cast<float>(xTaskGetTickCount() - trackProgressUpdateTime) /
+                                             static_cast<float>(configTICK_RATE_HZ)) *
+                                            getPlaybackSpeed());
   }
   return trackProgress;
 }

@@ -233,9 +233,9 @@ int DfuService::ControlPointHandler(uint16_t connectionHandle, os_mbuf* om) {
         bleController.State(Pinetime::Controllers::Ble::FirmwareUpdateStates::Running);
         bleController.FirmwareUpdateTotalBytes(0xffffffffu);
         bleController.FirmwareUpdateCurrentBytes(0);
-        // Prep lock remains held; BleFirmwareUpdateStarted takes a second lock for the transfer.
-        // Both are released in Reset() (ReleasePrepAwake + BleFirmwareUpdateFinished).
+        // Hand off from prep wake to the transfer wake lock — avoid holding both.
         xTimerStop(prepTimeoutTimer, 0);
+        ReleasePrepAwake();
         systemTask.PushMessage(Pinetime::System::Messages::BleFirmwareUpdateStarted);
         updateLockHeld = true;
         xTimerStart(timeoutTimer, 0);
@@ -271,7 +271,7 @@ int DfuService::ControlPointHandler(uint16_t connectionHandle, os_mbuf* om) {
         NRF_LOG_INFO("[DFU] -> Receive firmware image requested, but we are not in Start Init");
         return 0;
       }
-      // TODO the chunk size is dependent of the implementation of the host application...
+      // Stock Gadgetbridge Nordic DFU uses legacy 20-byte packets (disableMtuRequest).
       dfuImage.Init(20, applicationSize, expectedCrc);
       NRF_LOG_INFO("[DFU] -> Starting receive firmware");
       state = States::Data;
@@ -426,8 +426,9 @@ void DfuService::NotificationManager::Reset() {
 }
 
 void DfuService::DfuImage::Init(size_t chunkSize, size_t totalSize, uint16_t expectedCrc) {
-  if (chunkSize != 20)
+  if (chunkSize != 20) {
     return;
+  }
   this->chunkSize = chunkSize;
   this->totalSize = totalSize;
   this->expectedCrc = expectedCrc;
@@ -437,8 +438,9 @@ void DfuService::DfuImage::Init(size_t chunkSize, size_t totalSize, uint16_t exp
 }
 
 void DfuService::DfuImage::Append(uint8_t* data, size_t size) {
-  if (!ready)
+  if (!ready) {
     return;
+  }
   ASSERT(size <= 20);
 
   std::memcpy(tempBuffer + bufferWriteIndex, data, size);
@@ -453,8 +455,9 @@ void DfuService::DfuImage::Append(uint8_t* data, size_t size) {
   if (bufferWriteIndex > 0 && totalWriteIndex + bufferWriteIndex == totalSize) {
     spiNorFlash.Write(writeOffset + totalWriteIndex, tempBuffer, bufferWriteIndex);
     totalWriteIndex += bufferWriteIndex;
-    if (totalSize < maxSize)
+    if (totalSize < maxSize) {
       WriteMagicNumber();
+    }
   }
 }
 

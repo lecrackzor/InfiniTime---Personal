@@ -57,6 +57,7 @@ namespace Pinetime {
 
       bool isCharacteristicDiscovered = false;
       uint16_t currentTimeHandle;
+      bool readRetried = false;
       std::function<void(uint16_t)> onServiceDiscovered;
     };
   }

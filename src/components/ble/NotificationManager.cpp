@@ -18,6 +18,23 @@ bool NotificationManager::PushIfNew(NotificationManager::Notification&& notif) {
     }
   }
 
+  // Same category + same title (e.g. ongoing chat) → replace the older entry so the
+  // list stays current instead of filling with near-duplicates.
+  const char* incomingTitle = notif.Title();
+  if (incomingTitle != nullptr && incomingTitle[0] != '\0') {
+    for (Notification::Idx idx = 0; idx < size; ++idx) {
+      const Notification& existing = At(idx);
+      if (existing.category != notif.category) {
+        continue;
+      }
+      const char* existingTitle = existing.Title();
+      if (existingTitle != nullptr && std::strcmp(existingTitle, incomingTitle) == 0) {
+        DismissIdx(idx);
+        break;
+      }
+    }
+  }
+
   notif.id = GetNextId();
   notif.valid = true;
   newNotification = true;

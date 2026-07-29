@@ -28,6 +28,13 @@ void HeartRateController::ReportHeartRateToService(uint8_t heartRate) {
   NotifyServiceIfChanged(heartRate);
 }
 
+void HeartRateController::NotifyHeartRateToService(uint8_t heartRate) {
+  lastReportedHeartRate = heartRate;
+  if (service != nullptr) {
+    service->OnNewHeartRateValue(heartRate);
+  }
+}
+
 void HeartRateController::Enable() {
   if (task != nullptr) {
     state = States::Stopped;

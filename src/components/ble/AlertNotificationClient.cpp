@@ -160,7 +160,41 @@ void AlertNotificationClient::OnNotification(ble_gap_event* event) {
     os_mbuf_copydata(event->notify_rx.om, headerSize, messageSize - 1, notif.message.data());
     notif.message[messageSize - 1] = '\0';
     notif.size = messageSize;
-    notif.category = Pinetime::Controllers::NotificationManager::Categories::SimpleAlert;
+
+    uint8_t categoryId = 0;
+    os_mbuf_copydata(event->notify_rx.om, 0, 1, &categoryId);
+    switch (categoryId) {
+      case 0x03: // Call
+        notif.category = Pinetime::Controllers::NotificationManager::Categories::IncomingCall;
+        break;
+      case 0x01:
+        notif.category = Pinetime::Controllers::NotificationManager::Categories::Email;
+        break;
+      case 0x02:
+        notif.category = Pinetime::Controllers::NotificationManager::Categories::News;
+        break;
+      case 0x04:
+        notif.category = Pinetime::Controllers::NotificationManager::Categories::MissedCall;
+        break;
+      case 0x05:
+        notif.category = Pinetime::Controllers::NotificationManager::Categories::Sms;
+        break;
+      case 0x06:
+        notif.category = Pinetime::Controllers::NotificationManager::Categories::VoiceMail;
+        break;
+      case 0x07:
+        notif.category = Pinetime::Controllers::NotificationManager::Categories::Schedule;
+        break;
+      case 0x08:
+        notif.category = Pinetime::Controllers::NotificationManager::Categories::HighProriotyAlert;
+        break;
+      case 0x09:
+        notif.category = Pinetime::Controllers::NotificationManager::Categories::InstantMessage;
+        break;
+      default:
+        notif.category = Pinetime::Controllers::NotificationManager::Categories::SimpleAlert;
+        break;
+    }
     if (notificationManager.PushIfNew(std::move(notif))) {
       systemTask.PushMessage(Pinetime::System::Messages::OnNewNotification);
     }

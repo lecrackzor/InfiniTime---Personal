@@ -53,7 +53,12 @@ void MotionController::Update(int16_t x, int16_t y, int16_t z, uint32_t nbSteps)
   }
 
   if (service != nullptr && (xHistory[0] != x || yHistory[0] != y || zHistory[0] != z)) {
-    service->OnNewMotionValues(x, y, z);
+    // Throttle raw motion notifies (~1 Hz) — step count stays change-only above.
+    TickType_t now = xTaskGetTickCount();
+    if ((now - lastMotionNotifyTime) >= pdMS_TO_TICKS(1000)) {
+      lastMotionNotifyTime = now;
+      service->OnNewMotionValues(x, y, z);
+    }
   }
 
   lastTime = time;

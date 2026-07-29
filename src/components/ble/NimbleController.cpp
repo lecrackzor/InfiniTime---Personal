@@ -4,6 +4,7 @@
 #include <nrf_log.h>
 #define min // workaround: nimble's min/max macros conflict with libstdc++
 #define max
+#include <host/ble_att.h>
 #include <host/ble_gap.h>
 #include <host/ble_hs.h>
 #include <host/ble_hs_id.h>
@@ -81,6 +82,9 @@ void NimbleController::Init() {
   ble_hs_cfg.reset_cb = nimble_on_reset;
   ble_hs_cfg.sync_cb = nimble_on_sync;
   ble_hs_cfg.store_status_cb = ble_store_util_status_rr;
+
+  // Ask centrals (e.g. Gadgetbridge) for a larger ATT MTU so FS/DFU can use bigger chunks.
+  ble_att_set_preferred_mtu(preferredAttMtu);
 
   ble_svc_gap_init();
   ble_svc_gatt_init();
@@ -201,11 +205,13 @@ int NimbleController::OnGAPEvent(ble_gap_event* event) {
         currentTimeClient.Reset();
         alertNotificationClient.Reset();
         connectionHandle = BLE_HS_CONN_HANDLE_NONE;
+        negotiatedMtu = defaultAttMtu;
         bleController.Disconnect();
         fastAdvCount = 0;
         StartAdvertising();
       } else {
         connectionHandle = event->connect.conn_handle;
+        negotiatedMtu = defaultAttMtu;
         bleController.Connect();
         systemTask.PushMessage(Pinetime::System::Messages::BleConnected);
         // Service discovery is deferred via systemtask
@@ -224,7 +230,9 @@ int NimbleController::OnGAPEvent(ble_gap_event* event) {
       currentTimeClient.Reset();
       alertNotificationClient.Reset();
       dfuService.OnDisconnect();
+      fsService.OnDisconnect();
       connectionHandle = BLE_HS_CONN_HANDLE_NONE;
+      negotiatedMtu = defaultAttMtu;
       if (bleController.IsConnected()) {
         bleController.Disconnect();
         fastAdvCount = 0;
@@ -326,17 +334,22 @@ int NimbleController::OnGAPEvent(ble_gap_event* event) {
       if (event->subscribe.reason == BLE_GAP_SUBSCRIBE_REASON_TERM) {
         heartRateService.UnsubscribeNotification(event->subscribe.attr_handle);
         motionService.UnsubscribeNotification(event->subscribe.attr_handle);
+        batteryInformationService.UnsubscribeNotification(event->subscribe.attr_handle);
       } else if (event->subscribe.prev_notify == 0 && event->subscribe.cur_notify == 1) {
         heartRateService.SubscribeNotification(event->subscribe.attr_handle);
         motionService.SubscribeNotification(event->subscribe.attr_handle);
+        batteryInformationService.SubscribeNotification(event->subscribe.attr_handle);
+        batteryInformationService.SeedNotification(event->subscribe.conn_handle);
       } else if (event->subscribe.prev_notify == 1 && event->subscribe.cur_notify == 0) {
         heartRateService.UnsubscribeNotification(event->subscribe.attr_handle);
         motionService.UnsubscribeNotification(event->subscribe.attr_handle);
+        batteryInformationService.UnsubscribeNotification(event->subscribe.attr_handle);
       }
       break;
 
     case BLE_GAP_EVENT_MTU:
       NRF_LOG_INFO("MTU Update event; conn_handle=%d cid=%d mtu=%d", event->mtu.conn_handle, event->mtu.channel_id, event->mtu.value);
+      negotiatedMtu = event->mtu.value;
       break;
 
     case BLE_GAP_EVENT_REPEAT_PAIRING: {
@@ -375,6 +388,9 @@ int NimbleController::OnGAPEvent(ble_gap_event* event) {
 
     case BLE_GAP_EVENT_NOTIFY_TX:
       NRF_LOG_INFO("Notify event : BLE_GAP_EVENT_NOTIFY_TX");
+      if (event->notify_tx.status == 0) {
+        fsService.OnNotifyTxComplete(event->notify_tx.attr_handle);
+      }
       break;
 
     case BLE_GAP_EVENT_IDENTITY_RESOLVED:
@@ -396,6 +412,17 @@ void NimbleController::StartDiscovery() {
 
 uint16_t NimbleController::connHandle() {
   return connectionHandle;
+}
+
+uint16_t NimbleController::AttMtu() const {
+  if (connectionHandle == BLE_HS_CONN_HANDLE_NONE) {
+    return defaultAttMtu;
+  }
+  uint16_t mtu = ble_att_mtu(connectionHandle);
+  if (mtu < defaultAttMtu) {
+    return negotiatedMtu >= defaultAttMtu ? negotiatedMtu : defaultAttMtu;
+  }
+  return mtu;
 }
 
 void NimbleController::NotifyBatteryLevel(uint8_t level) {
@@ -448,7 +475,7 @@ void NimbleController::PersistBond(struct ble_gap_conn_desc& desc) {
     int peer_count = 0;
     ble_store_util_count(BLE_STORE_OBJ_TYPE_CCCD, &peer_count);
     for (int i = 0; i < peer_count; i++) {
-      key.cccd.idx = peer_count;
+      key.cccd.idx = i;
       ble_store_read_cccd(&key.cccd, &peer_cccd_set[i].cccd);
     }
 

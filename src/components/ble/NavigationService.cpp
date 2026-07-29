@@ -83,9 +83,11 @@ int Pinetime::Controllers::NavigationService::OnCommand(struct ble_gatt_access_c
 
   if (ctxt->op == BLE_GATT_ACCESS_OP_WRITE_CHR) {
     size_t notifSize = OS_MBUF_PKTLEN(ctxt->om);
-    uint8_t data[notifSize + 1];
-    data[notifSize] = '\0';
-    os_mbuf_copydata(ctxt->om, 0, notifSize, data);
+    constexpr size_t maxNavWrite = 256;
+    size_t copySize = notifSize > maxNavWrite ? maxNavWrite : notifSize;
+    uint8_t data[maxNavWrite + 1];
+    data[copySize] = '\0';
+    os_mbuf_copydata(ctxt->om, 0, copySize, data);
     char* s = (char*) &data[0];
     if (ble_uuid_cmp(ctxt->chr->uuid, &navFlagCharUuid.u) == 0) {
       m_flag = s;

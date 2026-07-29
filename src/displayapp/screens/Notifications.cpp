@@ -43,6 +43,10 @@ Notifications::Notifications(DisplayApp* app,
     wakeLock.Lock();
     if (notification.category == Controllers::NotificationManager::Categories::IncomingCall) {
       motorController.StartRinging();
+    } else if (notification.category == Controllers::NotificationManager::Categories::HighProriotyAlert) {
+      motorController.RunForDuration(70);
+    } else if (notification.category == Controllers::NotificationManager::Categories::MissedCall) {
+      motorController.RunForDuration(50);
     } else {
       motorController.RunForDuration(35);
     }
@@ -242,6 +246,61 @@ namespace {
     auto* item = static_cast<Notifications::NotificationItem*>(obj->user_data);
     item->OnCallButtonEvent(obj, event);
   }
+
+  const char* CategorySymbol(Pinetime::Controllers::NotificationManager::Categories category) {
+    using Categories = Pinetime::Controllers::NotificationManager::Categories;
+    switch (category) {
+      case Categories::IncomingCall:
+        return Symbols::phone;
+      case Categories::MissedCall:
+      case Categories::VoiceMail:
+        return Symbols::phoneSlash;
+      case Categories::Email:
+        return Symbols::list;
+      case Categories::Sms:
+      case Categories::InstantMessage:
+        return Symbols::bell;
+      case Categories::Schedule:
+        return Symbols::clock;
+      case Categories::News:
+        return Symbols::info;
+      case Categories::HighProriotyAlert:
+        return Symbols::bolt;
+      case Categories::SimpleAlert:
+      case Categories::Unknown:
+      default:
+        return Symbols::bell;
+    }
+  }
+
+  const char* CategoryFallbackTitle(Pinetime::Controllers::NotificationManager::Categories category) {
+    using Categories = Pinetime::Controllers::NotificationManager::Categories;
+    switch (category) {
+      case Categories::IncomingCall:
+        return "Incoming call";
+      case Categories::MissedCall:
+        return "Missed call";
+      case Categories::Email:
+        return "Email";
+      case Categories::Sms:
+        return "SMS";
+      case Categories::InstantMessage:
+        return "Message";
+      case Categories::Schedule:
+        return "Calendar";
+      case Categories::News:
+        return "News";
+      case Categories::VoiceMail:
+        return "Voicemail";
+      case Categories::HighProriotyAlert:
+        return "Important";
+      case Categories::SimpleAlert:
+        return "Notification";
+      case Categories::Unknown:
+      default:
+        return "Notification";
+    }
+  }
 }
 
 Notifications::NotificationItem::NotificationItem(Pinetime::Controllers::AlertNotificationService& alertNotificationService,
@@ -285,10 +344,15 @@ Notifications::NotificationItem::NotificationItem(const char* title,
   lv_label_set_text_fmt(alert_count, "%i/%i", notifNr, notifNb);
   lv_obj_align(alert_count, nullptr, LV_ALIGN_IN_TOP_RIGHT, 0, 16);
 
+  lv_obj_t* alert_icon = lv_label_create(container, nullptr);
+  lv_obj_set_style_local_text_color(alert_icon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, Colors::orange);
+  lv_label_set_text_static(alert_icon, CategorySymbol(category));
+  lv_obj_align(alert_icon, nullptr, LV_ALIGN_IN_TOP_LEFT, 0, 16);
+
   lv_obj_t* alert_type = lv_label_create(container, nullptr);
   lv_obj_set_style_local_text_color(alert_type, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, Colors::orange);
-  if (title == nullptr) {
-    lv_label_set_text_static(alert_type, "Notification");
+  if (title == nullptr || title[0] == '\0') {
+    lv_label_set_text_static(alert_type, CategoryFallbackTitle(category));
   } else {
     // copy title to label and replace newlines with spaces
     lv_label_set_text(alert_type, title);
@@ -300,8 +364,8 @@ Notifications::NotificationItem::NotificationItem(const char* title,
     lv_label_refr_text(alert_type);
   }
   lv_label_set_long_mode(alert_type, LV_LABEL_LONG_SROLL_CIRC);
-  lv_obj_set_width(alert_type, 180);
-  lv_obj_align(alert_type, nullptr, LV_ALIGN_IN_TOP_LEFT, 0, 16);
+  lv_obj_set_width(alert_type, 160);
+  lv_obj_align(alert_type, alert_icon, LV_ALIGN_OUT_RIGHT_MID, 8, 0);
 
   lv_obj_t* alert_subject = lv_label_create(subject_container, nullptr);
   lv_label_set_long_mode(alert_subject, LV_LABEL_LONG_BREAK);
