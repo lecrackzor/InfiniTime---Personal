@@ -295,23 +295,15 @@ void HeartRateTask::HandleSensorData() {
       if (bpm.has_value()) {
         valueCurrentlyShown = true;
         controller.UpdateState(ControllerStates::Ready);
-        if (state == States::BackgroundMeasuring) {
-          // Cont (interval 0): sensor stays on; Ppg::HeartRate() returns ~every 48 ms
-          // while locked — must be change-only or GB floods at ~20 Hz.
-          // Timed intervals (30s/3m/…): one always-notify per StartMeasurement session.
-          auto period = BackgroundMeasurementInterval();
-          const bool continuousBackground = period.has_value() && period.value() == 0;
-          if (continuousBackground) {
-            controller.UpdateHeartRate(bpm.value());
-          } else if (!backgroundBleSent) {
-            // Always notify once per timed interval so stable BPM still lands in GB.
-            controller.NotifyHeartRateToService(bpm.value());
-            backgroundBleSent = true;
-          } else {
-            controller.UpdateHeartRate(bpm.value());
-          }
+        // BLE policy is independent of screen on/off. Companion charts must not starve
+        // just because the watch face is awake (foreground used to be change-only only).
+        // First lock of each StartMeasurement session always notifies (covers timed BG
+        // and the first FG/Cont sample). After that: change-only + ~30s stale floor in
+        // HeartRateController (avoids Cont ~20 Hz flood while locked).
+        if (!backgroundBleSent) {
+          controller.NotifyHeartRateToService(bpm.value());
+          backgroundBleSent = true;
         } else {
-          // Foreground: same ~48 ms return rate — change-only only.
           controller.UpdateHeartRate(bpm.value());
         }
       } else if (ppg.SufficientData()) {

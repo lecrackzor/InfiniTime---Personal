@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <FreeRTOS.h>
 #include <components/ble/HeartRateService.h>
 
 namespace Pinetime {
@@ -46,6 +47,9 @@ namespace Pinetime {
       States state = States::Disabled;
       uint8_t heartRate = 0;
       uint8_t lastReportedHeartRate = 0;
+      // Cont/foreground are change-only (~48 ms PPG). Without a floor, stable BPM
+      // can leave Gadgetbridge silent for many minutes while the watch still shows HR.
+      TickType_t lastBleNotifyTick = 0;
       Pinetime::Controllers::HeartRateService* service = nullptr;
     };
   }

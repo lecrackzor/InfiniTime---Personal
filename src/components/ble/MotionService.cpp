@@ -113,8 +113,12 @@ void MotionService::OnNewMotionValues(int16_t x, int16_t y, int16_t z) {
 void MotionService::SubscribeNotification(uint16_t attributeHandle) {
   if (attributeHandle == stepCountHandle) {
     stepCountNotificationEnabled = true;
+    // Seed current steps — change-only + sit-still would otherwise leave GB empty
+    // until the next step after reconnect/subscribe.
+    OnNewStepCountValue(motionController.NbSteps());
   } else if (attributeHandle == motionValuesHandle) {
     motionValuesNotificationEnabled = true;
+    OnNewMotionValues(motionController.X(), motionController.Y(), motionController.Z());
   }
 }
 
