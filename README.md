@@ -1,115 +1,123 @@
 # InfiniTime — Personal
 
-Personal [InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime) fork for the PineTime. Built on upstream `main`; this page only covers what differs.
+Personal [InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime) fork for the **PineTime**. Built on upstream `main`; this page covers what differs and how to use it.
 
 ![Casio Custom — Warm Cockpit](doc/personal/casio-custom-warm-cockpit.png)
 
-## Changes vs upstream
+**Companion:** stock [Gadgetbridge](https://codeberg.org/Freeyourgadget/Gadgetbridge) (no custom companion fork required).
 
-### Heart rate
-- Background interval options: Off, Continuous, 30s, 1m, **3m**, 5m, 10m (removed 30m)
-- **Start** state persists across reboot (so background HR keeps working after power cycle)
-- Pauses while charging; resumes when unplugged
-- Watch faces no longer show a bogus `0` BPM while measuring / waiting for a valid sample
-- While PPG is re-acquiring, keep the last known BPM on screen (only clear when nothing was shown yet)
-- **PPGv2** heart-rate algorithm ([upstream #2371](https://github.com/InfiniTimeOrg/InfiniTime/pull/2371)): motion-adaptive filtering, auto gain/drive, reports failure instead of wrong BPM
-- PPGv2: still run AGC / background timeout when `hrs == 0` so off-wrist no-touch cannot spin the green LED forever
+**Simulator:** [InfiniSim — Personal](https://github.com/lecrackzor/InfiniSim---Personal)
 
-### Casio Custom watchface
-- Renamed from **Casio Style G7710** to **Casio Custom**
-- Weather-focused layout: date and day on the left; icon, temperature, and daily low/high on the right (replaces week number / day-of-year)
+---
+
+## Highlights
+
+| Area | Personal changes |
+| --- | --- |
+| Watch face | **Casio Custom** (Warm Cockpit) — weather-first layout, default face |
+| Heart rate | PPGv2, background intervals including **3m**, charging pause, saner GB reporting |
+| Apps / faces | Trimmed firmware (no Paint/Paddle/Twos/Dice/Metronome; Analog/PTS/Infineat/Pride Flag off by default) |
+| BLE | Hardened DFU/FS/HR/notifications for stock Gadgetbridge |
+| Defaults | Double-tap wake on; Casio Custom face (factory / wiped settings only) |
+
+---
+
+## Flash
+
+1. Enable **Firmware & files** on the watch.
+2. Install the DFU zip from Gadgetbridge (or copy `build-output/pinetime-mcuboot-app-dfu-1.16.0.zip.fw`).
+3. Latest personal build artifact (local): `build-output/pinetime-mcuboot-app-dfu-1.16.0.zip`
+
+Upstream docs for build/flash/BLE live under [`doc/`](doc/).
+
+---
+
+## Casio Custom
+
+Renamed from Casio Style G7710.
+
+- Weather-focused layout: date/day left; icon, temperature, daily low/high right
 - Empty weather shows `--` / `L--` `H--` until Gadgetbridge syncs
-- **Warm Cockpit** theme (fixed role colors): amber time, orange date/day, soft-cyan weather, red HR, lime steps, dim-amber lines/status chrome
-- Battery % and icon keep the independent Terminal HSV charge curve (green→yellow→red; not themed)
-- Long-press overlay: brightness only (paintbrush single-color cycle removed for this themed face)
-- Top status bar shows a bell when the alarm is enabled
-- Status icons realign only when battery / BLE / alarm / notification state changes
-- Flash font load falls back to built-in JetBrains if `lv_font_load` fails
-- No AM/PM letter on the face (12h still shows 1–12 digits only)
-- **Two flash fonts** (PPGv2 RAM headroom): `7segments_115` for the big time + `lv_font_dots_40` for date/day/temp; dropped `7segments_40`. L/H still use built-in JetBrains Bold 20
+- **Warm Cockpit** colors: amber time, orange date/day, soft-cyan weather, red HR, lime steps
+- Battery % keeps the Terminal HSV charge curve (green→yellow→red)
+- Long-press overlay: brightness only
+- Status bar: alarm bell when enabled; icons realign only on state change
+- Two flash fonts (`7segments_115` + `lv_font_dots_40`); JetBrains Bold 20 for L/H
+- No AM/PM letter (12h still shows 1–12)
 
-InfiniSim README screenshots of this face should populate weather, HR, and steps (`--casio-preview` does this automatically, or use `w` / `h` / `s` in the sim); empty weather shows `--` placeholders.
+InfiniSim: populate weather/HR/steps with `--casio-preview`, or keys `w` / `h` / `s`.
 
-### Watch faces
-Built into firmware: **Digital**, **Terminal**, **Casio Custom** (default for factory / wiped settings).
-Removed from the default build: Analog, PineTimeStyle, Infineat, Pride Flag (also drops `open_sans_light` from firmware fonts).
+---
 
-### Apps
-Removed from the default app list **and no longer compiled**:
-- Paint
-- Paddle
-- Twos
-- Dice
-- Metronome
+## Heart rate
 
-Kept: Stopwatch, Alarm, Timer, Steps, Heart Rate, Music, Navigation, Calculator, Weather
+- Background intervals: Off, Continuous, **30s**, **1m**, **3m**, **5m**, **10m** (30m removed)
+- **Start** state persists across reboot
+- Pauses while charging; resumes when unplugged
+- Faces show no bogus `0` BPM; hold last BPM while Searching (clear only if none yet)
+- **PPGv2** ([upstream #2371](https://github.com/InfiniTimeOrg/InfiniTime/pull/2371)): motion-adaptive filtering, AGC, reports failure instead of wrong BPM
+- AGC / background timeout still run when `hrs == 0` (off-wrist LED cannot spin forever)
 
-App polish:
-- Heart Rate: DirtyValue-gated BPM/status; status text includes **Ready** (not “Measuring…”)
-- StopWatch: DirtyValue-gated hundredths (less LVGL churn while running)
-- Timer: long-press release no longer flashes **Start** while ringing
-- Alarm: dismisses open info overlay when alerting; tighter “time to alarm” copy
-- Counter widget: skip redraw when value unchanged (helps Timer)
+### Gadgetbridge reporting
 
-### Defaults
-- Watch face: **Casio Custom** (factory / wiped settings only; existing `settings.dat` is unchanged)
-- Wake-up: **Double Tap** enabled by default (factory / wiped settings only; existing `settings.dat` is unchanged)
+| Mode | BLE behavior |
+| --- | --- |
+| Timed background (30s / 3m / …) | One always-notify per measurement session |
+| Continuous / foreground | Change-only notifies |
+| Searching with held face BPM | No BLE `0` spam |
+| Subscribe seed | Only if BPM > 0 |
 
-### Bug fixes
-- Timer: screen can sleep again after tapping **Reset** during the ring ([upstream #2419](https://github.com/InfiniTimeOrg/InfiniTime/issues/2419))
-- Timer: keep buzzing for the full 10s after expiry if ringing was interrupted ([upstream #2428](https://github.com/InfiniTimeOrg/InfiniTime/pull/2428))
-- Alarm: dismissing a ringing alarm returns to the previous screen instead of the editable alarm config ([upstream #2405](https://github.com/InfiniTimeOrg/InfiniTime/issues/2405))
-- Notifications no longer interrupt a ringing alarm/timer or the flashlight ([upstream #1223](https://github.com/InfiniTimeOrg/InfiniTime/issues/1223) / [#610](https://github.com/InfiniTimeOrg/InfiniTime/issues/610))
-- Motor: `StopRinging()` also cancels any pending short vibration pulse
-- HR: charging pause clears stale BPM; HR task queue send is ISR-safe when called from task context
-- BLE FS: `WriteResponse.status` always initialized (success and failure); oversize path early-outs release the file-transfer wake lock ([upstream #2457](https://github.com/InfiniTimeOrg/InfiniTime/issues/2457))
-- BLE CTS: initialize `dayofweek` and `reason` on current-time reads ([upstream #2459](https://github.com/InfiniTimeOrg/InfiniTime/pull/2459))
-- SPI: chunk EasyDMA reads to ≤255 bytes (same limit as writes) ([upstream #2391](https://github.com/InfiniTimeOrg/InfiniTime/pull/2391))
-- FS: serialize littlefs with a recursive mutex across tasks ([upstream #2449](https://github.com/InfiniTimeOrg/InfiniTime/pull/2449))
-- Persist time + steps across soft reboots via noinit RAM ([upstream #2400](https://github.com/InfiniTimeOrg/InfiniTime/pull/2400) / [#2293](https://github.com/InfiniTimeOrg/InfiniTime/issues/2293))
-- DisplayApp: no-op `LVGL_GUARD` hooks for InfiniSim thread-safety ([upstream #2447](https://github.com/InfiniTimeOrg/InfiniTime/pull/2447))
-- Weather: equality compares `minTemperature` to `minTemperature` (was wrongly vs `max`)
-- DateTime: compile-time fallback year set after logger init ([upstream #2396](https://github.com/InfiniTimeOrg/InfiniTime/issues/2396))
-- DateTime: `to_time_t` cast compatible with libc++ ([upstream #2456](https://github.com/InfiniTimeOrg/InfiniTime/pull/2456))
-- GPIOTE: button + touch use high-accuracy sensing so edges are not dropped while both IRQs are live ([upstream #2346](https://github.com/InfiniTimeOrg/InfiniTime/issues/2346))
-- DisplayApp: `TouchEvent` queue send is non-blocking (same deadlock avoidance as notifications) ([upstream #2290](https://github.com/InfiniTimeOrg/InfiniTime/issues/2290) / [#2124](https://github.com/InfiniTimeOrg/InfiniTime/issues/2124))
-- Stopwatch: rebuild lap list in one buffer instead of repeated `lv_label_ins_text` (reduces LVGL churn under mash)
-- Docker: ensure `build.sh` is executable in the image ([upstream #2367](https://github.com/InfiniTimeOrg/InfiniTime/pull/2367))
-- Battery icon: low-battery color no longer overwrites the configured base color ([upstream #2208](https://github.com/InfiniTimeOrg/InfiniTime/pull/2208))
-- Battery icon / Digital status: continuous green→yellow→red tint from charge % (Terminal curve; same idea as upstream [#1964](https://github.com/InfiniTimeOrg/InfiniTime/pull/1964))
-- Music: show waiting placeholders until real track metadata arrives ([upstream #1841](https://github.com/InfiniTimeOrg/InfiniTime/pull/1841))
-- SPI: chunk `WriteCmdAndBuffer` payloads the same way as reads/writes
-- Stopwatch: lap labels wrap in 1..999 (0 is empty-slot sentinel, so `% 1000` made laps vanish)
-- Notifications: `GetPrevious` bounds against valid count, not buffer capacity
-- Notifications: drop exact duplicates already in the ring buffer (common companion double-send)
-- Notifications: FS/DFU deny alerts also gate `OnNewNotification` on `PushIfNew` (no re-vibe on spam)
-- Notifications: don't rebuild the preview screen when already previewing (avoids re-vibe + timeout reset)
-- Music GATT: register track-number UUID once (was a duplicate total-length characteristic)
-- DateTime: skip `OnNewTime` when CTS pushes an unchanged wall clock (avoids redundant alarm reschedule)
-- Motor: coalesce `StartRinging()` if already ringing
-- Chime: don't reload Clock when already there; don't interrupt ringing timer/alarm/call/flashlight
-- Pairing: update passkey in place instead of rebuilding PassKey
-- Charging: ignore duplicate power-present edges; HR pause/resume only transitions once
-- Alarm: coalesce `SetOffAlarmNow` / don't leak a second auto-stop LVGL task while alerting
-- CI: set `REF_NAME` in the InfiniSim job so artifacts are not named `infinitisim-` ([upstream #2223](https://github.com/InfiniTimeOrg/InfiniTime/issues/2223))
-- HR: wake sensor after unplug even if the screen was already on; never publish ambient `-1`/`-2` as BPM 254/255
-- Charging: latch handled power-present so `MeasureVoltage` can't make a real plug edge look like a no-op
-- BLE FS: hold `FS::Lock` across open/seek/read|write/close; don't `FileClose` after a failed READ_PACING open
-- Alarm settings: only `DirClose` when `DirOpen` succeeded
-- Music: initialize play/position members; return metadata by const ref (no per-refresh string copies)
-- DFU: keep version `0x0008` separate from GATT handles; stop re-resolving chars on every access
-- DFU: wake lock from first DFU GATT access (60s prep timeout) so the watch does not sleep while Gadgetbridge connects / discovers before `StartDFU`
+---
 
-**DFU keep-awake check (on watch):** Firmware & files Enabled; screen timeout 5s; start GB install after the face dims — watch should wake/stay awake through discovery; abort mid-prep → sleep returns within ~60s; full OTA still validates.
-- SystemTask: grow main stack 350→400 words (margin for upstream [#2407](https://github.com/InfiniTimeOrg/InfiniTime/issues/2407) worst-case)
-- Pairing: vibrate only when first showing PassKey
-- Notifications / HR controller: defensive empty-message and null-service guards
+## Watch faces & apps
 
-### InfiniSim
-Companion simulator: [InfiniSim---Personal](https://github.com/lecrackzor/InfiniSim---Personal) (trimmed faces/apps, PPGv2 HR, Warm Cockpit Casio keys).
+**Built-in faces:** Digital, Terminal, **Casio Custom** (default for factory / wiped settings).
 
-Sim patches and helpers live in that repo (`tools/run-infinisim.sh`, etc.). Build the sim locally — its GitHub Actions CI is disabled.
+**Removed from default build:** Analog, PineTimeStyle, Infineat, Pride Flag (`open_sans_light` dropped).
+
+**Removed apps (not compiled):** Paint, Paddle, Twos, Dice, Metronome.
+
+**Kept:** Stopwatch, Alarm, Timer, Steps, Heart Rate, Music, Navigation, Calculator, Weather.
+
+App polish includes DirtyValue-gated HR/StopWatch redraws, Timer/Alarm UX fixes, and Counter skip-redraw when unchanged.
+
+---
+
+## Defaults (factory / wiped `settings.dat` only)
+
+- Watch face: **Casio Custom**
+- Wake-up: **Double Tap** enabled
+
+Existing settings files are left as-is on upgrade.
+
+---
+
+## Reliability & BLE hardenings
+
+Personal work beyond upstream cherry-picks focuses on watch stability with stock Gadgetbridge:
+
+- **HR BLE:** stop ~20 Hz floods from Cont/background; change-only where needed
+- **DFU:** prep wake lock, size caps, mbuf length checks, no write past image size
+- **FS BLE:** contiguous mbuf checks, path/payload length validation, TRUNC writes, LISTDIR abort safety
+- **Settings / alarm / bonds:** full-read validation, TRUNC saves, bond persist/restore checks
+- **Sensors:** recover stuck battery ADC; report SPI/I2C failures; single BMA421 poll owner
+- **UI:** notification container safety; HR faces clear on Ready→Searching; sleep brightness ramp aborts on wake
+
+Also includes a large set of upstream bugfixes (timer/alarm/notifications sleep, SPI EasyDMA chunking, littlefs mutex, soft-reboot persistence, GPIOTE accuracy, etc.). See git history for the full list.
+
+---
+
+## InfiniSim
+
+Companion simulator: [InfiniSim---Personal](https://github.com/lecrackzor/InfiniSim---Personal) (trimmed faces/apps, PPGv2, Warm Cockpit Casio keys).
+
+Build locally — GitHub Actions CI for the sim is disabled. Helpers live in that repo (`tools/run-infinisim.sh`, etc.).
+
+---
 
 ## Upstream
 
-Based on [InfiniTimeOrg/InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime). Same GPL-3.0-or-later license. Build, flash, and BLE docs live in upstream’s `doc/` tree.
+Based on [InfiniTimeOrg/InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime).
+
+- License: **GPL-3.0-or-later** (same as upstream)
+- Build, flash, and BLE protocol docs: upstream [`doc/`](https://github.com/InfiniTimeOrg/InfiniTime/tree/main/doc)
