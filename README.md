@@ -2,6 +2,8 @@
 
 Personal [InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime) fork for the **PineTime**. Built on upstream `main`; this page covers what differs and how to use it.
 
+> **Testing only.** This fork and its releases are experimental. Code and DFUs builds may contain bugs, regressions, or unfinished behavior. Prefer [upstream InfiniTime](https://github.com/InfiniTimeOrg/InfiniTime) for a stable daily driver unless you are deliberately testing personal changes.
+
 ![Casio Custom — Warm Cockpit](doc/personal/casio-custom-warm-cockpit.png)
 
 **Companion:** stock [Gadgetbridge](https://codeberg.org/Freeyourgadget/Gadgetbridge) (no custom companion fork required).
@@ -62,10 +64,10 @@ InfiniSim: populate weather/HR/steps with `--casio-preview`, or keys `w` / `h` /
 
 | Mode | BLE behavior |
 | --- | --- |
-| Timed background (30s / 3m / …) | One always-notify per measurement session |
-| Continuous / foreground | Change-only notifies |
-| Searching with held face BPM | No BLE `0` spam |
-| Subscribe seed | Only if BPM > 0 |
+| Timed (30s / 1m / 3m / …) | One always-notify per interval, screen on or off |
+| Continuous | Change-only notifies |
+| Searching with held face BPM | No BLE `0` spam; may still deliver held BPM when the interval is due |
+| Failed notify / failed wake | Deliver clock not advanced (owed slot kept) |
 
 ---
 

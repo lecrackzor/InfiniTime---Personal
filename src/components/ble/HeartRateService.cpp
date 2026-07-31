@@ -56,30 +56,31 @@ int HeartRateService::OnHeartRateRequested(uint16_t attributeHandle, ble_gatt_ac
   return 0;
 }
 
-void HeartRateService::OnNewHeartRateValue(uint8_t heartRateValue) {
-  if (!heartRateMeasurementNotificationEnable)
-    return;
+bool HeartRateService::TryNotifyHeartRateValue(uint8_t heartRateValue) {
+  if (!heartRateMeasurementNotificationEnable) {
+    return false;
+  }
+
+  uint16_t connectionHandle = nimble.connHandle();
+  if (connectionHandle == 0 || connectionHandle == BLE_HS_CONN_HANDLE_NONE) {
+    return false;
+  }
 
   uint8_t buffer[2] = {0, heartRateValue}; // [0] = flags, [1] = hr value
   auto* om = ble_hs_mbuf_from_flat(buffer, 2);
-
-  uint16_t connectionHandle = nimble.connHandle();
-
-  if (connectionHandle == 0 || connectionHandle == BLE_HS_CONN_HANDLE_NONE) {
-    return;
+  if (om == nullptr) {
+    return false;
   }
+  return ble_gattc_notify_custom(connectionHandle, heartRateMeasurementHandle, om) == 0;
+}
 
-  ble_gattc_notify_custom(connectionHandle, heartRateMeasurementHandle, om);
+void HeartRateService::OnNewHeartRateValue(uint8_t heartRateValue) {
+  (void) TryNotifyHeartRateValue(heartRateValue);
 }
 
 void HeartRateService::SubscribeNotification(uint16_t attributeHandle) {
   if (attributeHandle == heartRateMeasurementHandle) {
     heartRateMeasurementNotificationEnable = true;
-    // Seed only a real BPM — never push 0 (looks like a valid "no pulse" sample in GB).
-    const uint8_t hr = heartRateController.HeartRate();
-    if (hr > 0) {
-      heartRateController.NotifyHeartRateToService(hr);
-    }
   }
 }
 

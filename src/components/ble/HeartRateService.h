@@ -17,6 +17,8 @@ namespace Pinetime {
       void Init();
       int OnHeartRateRequested(uint16_t attributeHandle, ble_gatt_access_ctxt* context);
       void OnNewHeartRateValue(uint8_t hearRateValue);
+      // Queue a notify only when CCCD is on and connected. False = nothing left the radio.
+      bool TryNotifyHeartRateValue(uint8_t heartRateValue);
 
       void SubscribeNotification(uint16_t attributeHandle);
       void UnsubscribeNotification(uint16_t attributeHandle);

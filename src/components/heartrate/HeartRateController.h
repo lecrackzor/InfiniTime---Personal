@@ -1,16 +1,11 @@
 #pragma once
 
 #include <cstdint>
-#include <FreeRTOS.h>
 #include <components/ble/HeartRateService.h>
 
 namespace Pinetime {
   namespace Applications {
     class HeartRateTask;
-  }
-
-  namespace System {
-    class SystemTask;
   }
 
   namespace Controllers {
@@ -22,13 +17,12 @@ namespace Pinetime {
       void Enable();
       void Disable();
       void UpdateState(States newState);
+      // Update face + notify BLE only when the BPM value changes (stock behaviour).
       void UpdateHeartRate(uint8_t heartRate);
-      // Update the value shown on the watch face without notifying BLE.
+      // Update face only — no BLE (Searching hold).
       void UpdateDisplayedHeartRate(uint8_t heartRate);
-      // Notify BLE without changing the value shown on the watch face.
-      void ReportHeartRateToService(uint8_t heartRate);
-      // Update displayed BPM and always notify BLE (even if unchanged).
-      void NotifyHeartRateToService(uint8_t heartRate);
+      // Update face and attempt BLE notify. True only if the stack accepted the notify.
+      bool TryNotifyHeartRateToService(uint8_t heartRate);
 
       void SetHeartRateTask(Applications::HeartRateTask* task);
 
@@ -43,14 +37,9 @@ namespace Pinetime {
       void SetService(Pinetime::Controllers::HeartRateService* service);
 
     private:
-      void NotifyServiceIfChanged(uint8_t heartRate);
-
       Applications::HeartRateTask* task = nullptr;
       States state = States::Disabled;
       uint8_t heartRate = 0;
-      uint8_t lastReportedHeartRate = 0;
-      // Cont only: change-only (~48 ms PPG) needs a floor or stable BPM leaves GB silent.
-      TickType_t lastBleNotifyTick = 0;
       Pinetime::Controllers::HeartRateService* service = nullptr;
     };
   }

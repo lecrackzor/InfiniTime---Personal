@@ -35,18 +35,17 @@ namespace Pinetime {
 
       [[nodiscard]] bool BackgroundMeasurementNeeded() const;
       [[nodiscard]] std::optional<TickType_t> BackgroundMeasurementInterval() const;
+      [[nodiscard]] bool IsTimedInterval() const;
       TickType_t CurrentTaskDelay();
       void SendHeartRate(Controllers::HeartRateController::States state, int bpm);
+      void PublishTimedOrContinuous(uint8_t bpm);
+      void TryTimedNotifyHeld();
+      void AdvanceTimedSchedule(TickType_t deliveredAt);
 
       TaskHandle_t taskHandle;
       QueueHandle_t messageQueue;
       bool valueCurrentlyShown;
       bool pausedByCharging = false;
-      // One BLE attempt consumed for this StartMeasurement session.
-      bool backgroundBleSent = false;
-      // Timed 1/3/5m: last successful GB point (rate-limit screen-wake duplicates).
-      bool timedBleEverSent = false;
-      TickType_t lastTimedBleTick = 0;
       States state = States::Disabled;
       uint16_t count;
       uint16_t lastHrs = 0;
@@ -55,7 +54,12 @@ namespace Pinetime {
       Controllers::Settings& settings;
       Drivers::Bma421& motionSensor;
       Controllers::Ppg ppg;
+      // Last successful timed GB deliver (due = now - this >= period). Never advance on
+      // face-only locks, failed notifies, or failed BG wakes — those burned daytime slots.
       TickType_t lastMeasurementTime;
+      // When BG may wake again. Separate from lastMeasurementTime so a miss can back off
+      // without pretending a sample was delivered.
+      TickType_t nextBackgroundAttempt;
       TickType_t measurementStartTime;
     };
 

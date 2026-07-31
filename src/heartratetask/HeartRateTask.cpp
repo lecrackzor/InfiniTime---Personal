@@ -15,6 +15,8 @@ using ControllerStates = Pinetime::Controllers::HeartRateController::States;
 
 namespace {
   constexpr TickType_t backgroundMeasurementTimeLimit = 30 * configTICK_RATE_HZ;
+  // Failed BG wake: retry soon without advancing the deliver clock (keeps the owed slot).
+  constexpr TickType_t backgroundRetryBackoff = 20 * configTICK_RATE_HZ;
 
   inline bool in_isr() {
     return (SCB->ICSR & SCB_ICSR_VECTACTIVE_Msk) != 0;
@@ -29,6 +31,11 @@ std::optional<TickType_t> HeartRateTask::BackgroundMeasurementInterval() const {
   return interval.value() * configTICK_RATE_HZ;
 }
 
+bool HeartRateTask::IsTimedInterval() const {
+  auto period = BackgroundMeasurementInterval();
+  return period.has_value() && period.value() > 0;
+}
+
 bool HeartRateTask::BackgroundMeasurementNeeded() const {
   if (pausedByCharging) {
     return false;
@@ -37,7 +44,13 @@ bool HeartRateTask::BackgroundMeasurementNeeded() const {
   if (!backgroundPeriod.has_value()) {
     return false;
   }
-  return xTaskGetTickCount() - lastMeasurementTime >= backgroundPeriod.value();
+  const TickType_t now = xTaskGetTickCount();
+  if (backgroundPeriod.value() > 0) {
+    // Timed: wake schedule is independent of deliver debt.
+    return now >= nextBackgroundAttempt;
+  }
+  // Cont: stock single clock.
+  return now - lastMeasurementTime >= backgroundPeriod.value();
 };
 
 TickType_t HeartRateTask::CurrentTaskDelay() {
@@ -82,11 +95,16 @@ TickType_t HeartRateTask::CurrentTaskDelay() {
       if (pausedByCharging || !backgroundPeriod.has_value()) {
         return portMAX_DELAY;
       }
-      // Sleep until the next background measurement
+      if (backgroundPeriod.value() > 0) {
+        if (currentTime < nextBackgroundAttempt) {
+          return nextBackgroundAttempt - currentTime;
+        }
+        return 0;
+      }
+      // Cont
       if (currentTime - lastMeasurementTime < backgroundPeriod.value()) {
         return backgroundPeriod.value() - (currentTime - lastMeasurementTime);
       }
-      // If one is due now, go straight away
       return 0;
     case States::BackgroundMeasuring:
     case States::ForegroundMeasuring:
@@ -124,9 +142,13 @@ void HeartRateTask::Process(void* instance) {
 }
 
 void HeartRateTask::Work() {
-  // measurementStartTime is always initialised before use by StartMeasurement
-  // Need to initialise lastMeasurementTime so that the first background measurement happens at a reasonable time
-  lastMeasurementTime = xTaskGetTickCount();
+  // First BG attempt after one interval from boot (same as stock lastMeasurementTime = now).
+  const TickType_t boot = xTaskGetTickCount();
+  lastMeasurementTime = boot;
+  nextBackgroundAttempt = boot;
+  if (auto period = BackgroundMeasurementInterval(); period.has_value() && period.value() > 0) {
+    nextBackgroundAttempt = boot + period.value();
+  }
   valueCurrentlyShown = false;
 
   while (true) {
@@ -216,6 +238,13 @@ void HeartRateTask::Work() {
                (state == States::ForegroundMeasuring || state == States::BackgroundMeasuring)) {
       StopMeasurement();
       controller.UpdateState(ControllerStates::Stopped);
+    } else if (newState == States::BackgroundMeasuring && state == States::ForegroundMeasuring) {
+      // Long daytime FG already exceeds the 30s BG budget. Without refreshing the session
+      // clock, the first BG sample hits give-up and abandons an overdue interval.
+      if (xTaskGetTickCount() - measurementStartTime > backgroundMeasurementTimeLimit) {
+        measurementStartTime = xTaskGetTickCount();
+        count = 0;
+      }
     }
     if (newState == States::Disabled) {
       SendHeartRate(ControllerStates::Disabled, 0);
@@ -244,7 +273,6 @@ void HeartRateTask::StartMeasurement() {
   ppg.Reset();
   lastHrs = 0;
   count = 0;
-  backgroundBleSent = false;
   measurementStartTime = xTaskGetTickCount();
 }
 
@@ -252,6 +280,15 @@ void HeartRateTask::StopMeasurement() {
   heartRateSensor.Disable();
   ppg.Reset();
   lastHrs = 0;
+}
+
+void HeartRateTask::AdvanceTimedSchedule(TickType_t deliveredAt) {
+  auto period = BackgroundMeasurementInterval();
+  if (!period.has_value() || period.value() == 0) {
+    return;
+  }
+  lastMeasurementTime = deliveredAt;
+  nextBackgroundAttempt = deliveredAt + period.value();
 }
 
 void HeartRateTask::HandleSensorData() {
@@ -295,68 +332,21 @@ void HeartRateTask::HandleSensorData() {
       if (bpm.has_value()) {
         valueCurrentlyShown = true;
         controller.UpdateState(ControllerStates::Ready);
-
-        auto period = BackgroundMeasurementInterval();
-        const bool continuous = period.has_value() && period.value() == 0;
-        const bool timed = period.has_value() && period.value() > 0;
-
-        if (continuous) {
-          // Cont: first lock always-notifies; then change-only + ~30s stale floor.
-          if (!backgroundBleSent) {
-            controller.NotifyHeartRateToService(bpm.value());
-            backgroundBleSent = true;
-          } else {
-            controller.UpdateHeartRate(bpm.value());
-          }
-        } else if (timed) {
-          // 1/3/5m (and 30s): one GB point per schedule window — not a Cont stream.
-          // Background wakes are already gated by BackgroundMeasurementNeeded — always
-          // allow that one notify. Do not gate BG on lastTimedBleTick: success sets
-          // lastMeasurementTime to session start, so start+period arrives ~8s before
-          // notifyTime+period and would silently skip every other interval.
-          // Foreground (screen on) still rate-limits with lastTimedBleTick so wrist
-          // raises do not spam GB between scheduled points.
-          if (!backgroundBleSent) {
-            const TickType_t now = xTaskGetTickCount();
-            const bool due = (state == States::BackgroundMeasuring) || !timedBleEverSent ||
-                             (now - lastTimedBleTick) >= period.value();
-            if (due) {
-              controller.NotifyHeartRateToService(bpm.value());
-              timedBleEverSent = true;
-              lastTimedBleTick = now;
-            } else {
-              controller.UpdateDisplayedHeartRate(bpm.value());
-            }
-            backgroundBleSent = true;
-          } else {
-            controller.UpdateDisplayedHeartRate(bpm.value());
-          }
-        } else {
-          // Interval Off but measurement running (shouldn't normally happen).
-          controller.UpdateHeartRate(bpm.value());
-        }
+        PublishTimedOrContinuous(bpm.value());
       } else if (ppg.SufficientData()) {
-        // Keep last known BPM on the watch face while re-acquiring.
-        // Do not push 0 over BLE (poisons GB charts). Cont may re-arm always-notify
-        // on lost lock; timed must not — that would multi-fire inside one window.
+        // Face holds last BPM while re-acquiring; no BLE 0 (avoids chart holes).
         if (valueCurrentlyShown) {
           controller.UpdateState(ControllerStates::Searching);
-          auto period = BackgroundMeasurementInterval();
-          if (period.has_value() && period.value() == 0) {
-            backgroundBleSent = false;
-          }
+          // Daytime motion often sits in Searching through a whole 3m slot — still
+          // deliver the held value when the interval is due.
+          TryTimedNotifyHeld();
         } else {
           SendHeartRate(ControllerStates::Searching, 0);
         }
       } else {
-        // If there's currently a value shown, don't clear it
-        // But still update the algorithm state
         if (valueCurrentlyShown) {
           controller.UpdateState(ControllerStates::NotEnoughData);
-          auto period = BackgroundMeasurementInterval();
-          if (period.has_value() && period.value() == 0) {
-            backgroundBleSent = false;
-          }
+          TryTimedNotifyHeld();
         } else {
           SendHeartRate(ControllerStates::NotEnoughData, 0);
         }
@@ -366,10 +356,11 @@ void HeartRateTask::HandleSensorData() {
   }
 
   if (bpm.has_value()) {
-    // Maintain constant frequency acquisition in background mode
-    // If the last measurement time is set to the start time, then the next measurement
-    // will start exactly one background period after this one
-    // Avoid this if measurement exceeded the time limit (which happens with background intervals <= limit)
+    if (IsTimedInterval()) {
+      // Timed schedule advances only after a successful GB notify inside Publish*.
+      return;
+    }
+    // Cont: stock schedule bookkeeping.
     if (state == States::BackgroundMeasuring && xTaskGetTickCount() - measurementStartTime < backgroundMeasurementTimeLimit) {
       lastMeasurementTime = measurementStartTime;
     } else {
@@ -377,12 +368,15 @@ void HeartRateTask::HandleSensorData() {
     }
     return;
   }
-  // If been measuring for longer than the time limit, set the last measurement time
-  // This allows giving up on background measurement after a while (including NoTouch / hrs==0)
-  // and also means that background measurement won't begin immediately after
-  // an unsuccessful long foreground measurement
+  // Give up after the time limit (NoTouch / no lock).
   if (xTaskGetTickCount() - measurementStartTime > backgroundMeasurementTimeLimit) {
-    if (state == States::BackgroundMeasuring) {
+    if (IsTimedInterval()) {
+      // Never advance lastMeasurementTime here — that burned owed slots after failed wakes.
+      // Only push the next BG attempt so we stop measuring and retry soon.
+      if (state == States::BackgroundMeasuring) {
+        nextBackgroundAttempt = xTaskGetTickCount() + backgroundRetryBackoff;
+      }
+    } else if (state == States::BackgroundMeasuring) {
       lastMeasurementTime = xTaskGetTickCount() - backgroundMeasurementTimeLimit;
     } else {
       lastMeasurementTime = xTaskGetTickCount();
@@ -390,8 +384,65 @@ void HeartRateTask::HandleSensorData() {
   }
 }
 
+void HeartRateTask::PublishTimedOrContinuous(uint8_t bpm) {
+  if (!IsTimedInterval()) {
+    // Cont / Off: stock change-only.
+    controller.UpdateHeartRate(bpm);
+    return;
+  }
+
+  // Timed 1/3/5m: one GB point per interval whether screen is on or off.
+  const TickType_t now = xTaskGetTickCount();
+  auto period = BackgroundMeasurementInterval();
+  const bool due = (now - lastMeasurementTime) >= period.value();
+  if (!due) {
+    controller.UpdateDisplayedHeartRate(bpm);
+    return;
+  }
+
+  if (!controller.TryNotifyHeartRateToService(bpm)) {
+    // Face already updated by TryNotify; keep the owed slot until radio accepts.
+    return;
+  }
+  // Next interval from this deliver. Use session start for BG so wakes stay aligned
+  // to the measure cadence (stock); FG uses now.
+  if (state == States::BackgroundMeasuring && now - measurementStartTime < backgroundMeasurementTimeLimit) {
+    AdvanceTimedSchedule(measurementStartTime);
+  } else {
+    AdvanceTimedSchedule(now);
+  }
+}
+
+void HeartRateTask::TryTimedNotifyHeld() {
+  const uint8_t held = controller.HeartRate();
+  if (held == 0) {
+    return;
+  }
+  if (!IsTimedInterval()) {
+    return;
+  }
+  auto period = BackgroundMeasurementInterval();
+  const TickType_t now = xTaskGetTickCount();
+  if ((now - lastMeasurementTime) < period.value()) {
+    return;
+  }
+  if (!controller.TryNotifyHeartRateToService(held)) {
+    return;
+  }
+  if (state == States::BackgroundMeasuring && now - measurementStartTime < backgroundMeasurementTimeLimit) {
+    AdvanceTimedSchedule(measurementStartTime);
+  } else {
+    AdvanceTimedSchedule(now);
+  }
+}
+
 void HeartRateTask::SendHeartRate(ControllerStates state, int bpm) {
   valueCurrentlyShown = bpm != 0;
   controller.UpdateState(state);
-  controller.UpdateHeartRate(static_cast<uint8_t>(bpm));
+  // Timed: don't BLE-notify 0 (NoTouch/Searching) — punches holes in GB.
+  if (IsTimedInterval() && bpm == 0) {
+    controller.UpdateDisplayedHeartRate(0);
+  } else {
+    controller.UpdateHeartRate(static_cast<uint8_t>(bpm));
+  }
 }
